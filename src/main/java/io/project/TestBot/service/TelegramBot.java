@@ -2,6 +2,7 @@ package io.project.TestBot.service;
 
 import io.project.TestBot.config.BotConfig;
 import io.project.TestBot.model.UserSQL;
+import io.project.TestBot.model.User_hero;
 import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
@@ -31,6 +32,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private User_table user_table;
+    @Autowired
+    private User_hero user_hero;
 
     final BotConfig config;
 
