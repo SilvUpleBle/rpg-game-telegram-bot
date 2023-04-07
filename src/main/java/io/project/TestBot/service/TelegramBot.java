@@ -84,11 +84,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     break;
 
                 case "/timer":
-                    try {
-                        makeTimer(chatId, 15);
-                    } catch (InterruptedException e) {
-                        log.error("Error occurred: " + e.getMessage());
-                    }
+                    makeTimer(chatId, 15);
                     break;
 
                 case "/register":
@@ -136,33 +132,19 @@ public class TelegramBot extends TelegramLongPollingBot {
     // ТАЙМЕР
     //
 
-    private void makeTimer(long chatId, int seconds) throws InterruptedException {
+    private void makeTimer(long chatId, int seconds) {
         int secondsLeft = 0;
-        String newMessage = "[  ";
-
-        for (int i = 0; i < seconds; i++) {
-            newMessage += "<b>.</b> ";
-        }
-        newMessage += " ]";
+        String newMessage = "[  " + "<b>.</b> ".repeat(seconds) + " ]";
         sendMessage(chatId, newMessage);
 
         for (; secondsLeft <= seconds; secondsLeft++) {
-
             try {
-                TimeUnit.SECONDS.sleep(1);
+                TimeUnit.MILLISECONDS.sleep(750);
             } catch (InterruptedException e) {
                 log.error("Error occurred: " + e.getMessage());
             }
 
-            newMessage = "[  ";
-
-            for (int i = 0; i < seconds; i++) {
-                if (i < secondsLeft)
-                    newMessage += "<b>I</b> ";
-                else
-                    newMessage += "<b>.</b> ";
-            }
-            newMessage += " ]";
+            newMessage = "[  " + "<b>I</b> ".repeat(secondsLeft) + "<b>.</b> ".repeat(seconds - secondsLeft) + " ]";
             editMessage(chatId, newMessage);
         }
         sendMessage(chatId, "Время вышло!");
