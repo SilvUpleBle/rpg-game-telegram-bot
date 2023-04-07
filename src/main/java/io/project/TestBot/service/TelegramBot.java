@@ -3,6 +3,7 @@ package io.project.TestBot.service;
 import io.project.TestBot.config.BotConfig;
 import io.project.TestBot.model.UserSQL;
 import io.project.TestBot.model.User_hero;
+import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updates.GetUpdates;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -46,11 +48,10 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/register", "register user"));
         listOfCommands.add(new BotCommand("/command", "use command 1"));
         listOfCommands.add(new BotCommand("/help", "how to use this bot"));
-
+        listOfCommands.add(new BotCommand("/createHero", "create your hero"));
         try {
             this.execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
-            this.execute(new SendMessage(String.valueOf(-939824682), "Я проснувся!"));
-            // this.execute(new SendMessage(String.valueOf(808370703), "Я проснувся!"));
+            this.execute(new SendMessage(String.valueOf(808370703), "Я проснувся!"));
             this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         } catch (TelegramApiException e) {
             log.error("Error setting bot`s command list: " + e.getMessage());
@@ -81,6 +82,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                 case "/register":
                     registerUser(update.getMessage());
+                    break;
+
+                case "/createHero":
+                    createHero(update.getMessage());
                     break;
 
                 case "/command":
@@ -120,6 +125,48 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void registerHero(long userId, String name) {
+        if (user_hero.findById(userId).isEmpty()) {
+            UserHero user = new UserHero();
+
+            user.setUserId(userId);
+            user.setHeroName(name);
+
+            user_hero.save(user);
+            sendMessage(userId, "Персонаж создан");
+        } else {
+            sendMessage(userId, "У вас уже есть персонаж!");
+        }
+    }
+
+    private void createHero(Message message) {
+        long chatId = message.getChatId();
+        sendMessage(chatId,
+                message.getChat().getFirstName() + " давай начнем создание твоего персонажа, какое его имя?");
+        log.info("Start creating hero" + message.getChat().getFirstName());
+
+        // получаем сообщение
+        String textToSend = "Слава";
+        sendMessage(chatId, "Имя персонажа " + textToSend + " вы уверены?");
+        // получаем сообщение
+        // присваиваем сообщение textToSend = getMessage()
+        textToSend = "Нет";
+        switch (textToSend) {
+            case "Да":
+                sendMessage(chatId, "Персонаж создан");
+                break;
+            case "Нет":
+                sendMessage(chatId, "Введите имя персонажа");
+                // получение сообщения
+                registerHero(message.getChat().getId(), "Слава");
+                break;
+            default:
+                sendMessage(chatId, "Неизвестная команда");
+                break;
+        }
+    }
+
+    // private void
     private void startCommandRecieved(long chatId, String textToSend) {
         String answer = "Hi, " + textToSend + ", nice to meet you!";
         log.info("Replied to user " + textToSend);
