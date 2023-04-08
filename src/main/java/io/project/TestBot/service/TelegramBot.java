@@ -30,7 +30,9 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import lombok.extern.slf4j.Slf4j;
@@ -123,12 +125,17 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
 
                     case "/help":
-                        // sendMessage(chatId, HELP_TEXT);
-                        sendMessageKbHero(chatId, messageText);
+                        sendMessage(chatId, HELP_TEXT);
+
                         break;
 
                     default:
                         sendMessage(chatId, "Sorry, command wasn`t recogised! :(");
+
+                        sendMessageKbWithText(chatId, "sdf", new String[][] { { "Инвентарь" }, { "Голова", "Торс",
+                                "Руки", "Ноги" },
+                                { "Левая рука", "Правая рука" } });
+
                         break;
                 }
             }
@@ -200,13 +207,18 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                     case 3:
                         previousUserMessage = message.getText();
-                        sendMessage(message.getFrom().getId(),
-                                "Имя персонажа <b><i>%s</i></b>. Вы уверены?".formatted(previousUserMessage));
+                        sendMessageKbWithText(message.getFrom().getId(),
+                                "Имя персонажа <b><i>%s</i></b>. Вы уверены?".formatted(previousUserMessage),
+                                new String[][] { { "Да", "Нет" } });
+
                         waitForRequest = true;
                         currentStep = 4;
+
                         break;
                     case 4:
+
                         createHero(message, previousUserMessage);
+
                         break;
                     default:
                         break;
@@ -225,13 +237,16 @@ public class TelegramBot extends TelegramLongPollingBot {
         switch (message.getText()) {
             case "Да", "да":
                 registerHero(message.getFrom().getId(), heroName);
+                DeleteKb(message);
                 break;
             case "Нет", "нет":
                 createHero(message, (byte) 2);
+                DeleteKb(message);
                 break;
             default:
                 sendMessage(message.getFrom().getId(), "Неизвестная команда");
                 createHero(message, (byte) 2);
+                DeleteKb(message);
                 break;
         }
     }
@@ -290,26 +305,61 @@ public class TelegramBot extends TelegramLongPollingBot {
      * поножи}(вторая строка)и тд}
      */
 
-    private void sendMessageKbHero(long chatId, String textToSend) {
+    private void sendMessageKbWithText(long chatId, String str, String[][] arrStr) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
-        message.setText(textToSend);
         message.enableHtml(true);
-        String[][] rowArray = { { "svрь" }, { "Голова", "Торс", "Руки", "Ноги" },
-                { "Левая рука", "Правая рука" } };
+        message.setText(str);// без этого не работает
+
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setOneTimeKeyboard(true);
+
         List<KeyboardRow> keyboardRows = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
-        for (int i = 0; i < rowArray.length; i++) {
-            for (int j = 0; j < rowArray[i].length; j++) {
-                row.add(rowArray[i][j]);
+
+        for (int i = 0; i < arrStr.length; i++) {
+            for (int j = 0; j < arrStr[i].length; j++) {
+                row.add(arrStr[i][j]);
             }
+            keyboardRows.add(row);
             row = new KeyboardRow();
         }
-        keyboardRows.add(row);
+
         keyboardMarkup.setKeyboard(keyboardRows);
+
+        keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setSelective(true);
+        message.setReplyMarkup(keyboardMarkup);
+        try {
+            lastMessageId = execute(message).getMessageId();
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void sendMessageKb(long chatId, String[][] arrStr) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.enableHtml(true);
+        message.setText("");// без этого не работает
+
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         keyboardMarkup.setOneTimeKeyboard(true);
         keyboardMarkup.setResizeKeyboard(true);
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+
+        keyboardMarkup.getOneTimeKeyboard();
+
+        for (int i = 0; i < arrStr.length; i++) {
+            for (int j = 0; j < arrStr[i].length; j++) {
+                row.add(arrStr[i][j]);
+            }
+            keyboardRows.add(row);
+            row = new KeyboardRow();
+        }
+
+        keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);
 
         try {
@@ -317,6 +367,10 @@ public class TelegramBot extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
+    }
+
+    private void DeleteKb(Message message) {
+        message.setReplyMarkup(null);
     }
 
     private void sendMessage(long chatId, String textToSend) {
