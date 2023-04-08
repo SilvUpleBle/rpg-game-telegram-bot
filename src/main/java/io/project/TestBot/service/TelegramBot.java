@@ -8,17 +8,21 @@ import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatAdministrators;
+import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChat;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
+import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -50,17 +54,21 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     static final String HELP_TEXT = "Приветик!";
 
+    int lastMessageId;
+
     public TelegramBot(BotConfig config) {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
         listOfCommands.add(new BotCommand("/start", "switch bot on"));
         listOfCommands.add(new BotCommand("/register", "register user"));
+        listOfCommands.add(new BotCommand("/timer", "timer for 15 seconds"));
         listOfCommands.add(new BotCommand("/command", "use command 1"));
         listOfCommands.add(new BotCommand("/help", "how to use this bot"));
         listOfCommands.add(new BotCommand("/createHero", "create your hero"));
         try {
-            this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
-            this.execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
+            execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
+            execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
+            // this.execute(new SendMessage(String.valueOf(-939824682), "Я проснувся!"));
             // this.execute(new SendMessage(String.valueOf(808370703), "Я проснувся!"));
         } catch (TelegramApiException e) {
             log.error("Error setting bot`s command list: " + e.getMessage());
@@ -240,11 +248,32 @@ public class TelegramBot extends TelegramLongPollingBot {
     //
     // КОНЕЦ БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
     //
+    
+    //
+    // ТАЙМЕР
+    //
+
+    private void makeTimer(long chatId, int seconds) {
+        int secondsLeft = 0;
+        String newMessage = "[  " + "<b>.</b> ".repeat(seconds) + " ]";
+        sendMessage(chatId, newMessage);
+
+        for (; secondsLeft <= seconds; secondsLeft++) {
+            try {
+                TimeUnit.MILLISECONDS.sleep(750);
+            } catch (InterruptedException e) {
+                log.error("Error occurred: " + e.getMessage());
+            }
+
+            newMessage = "[  " + "<b>I</b> ".repeat(secondsLeft) + "<b>.</b> ".repeat(seconds - secondsLeft) + " ]";
+            editMessage(chatId, newMessage);
+        }
+        sendMessage(chatId, "Время вышло!");
+    }
 
     //
     // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
     //
-
     private void startCommandRecieved(long chatId, String textToSend) {
         String answer = "Hi, " + textToSend + ", nice to meet you!";
         log.info("Replied to user " + textToSend);
@@ -257,12 +286,26 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
         message.enableHtml(true);
-
         try {
-            execute(message);
+            lastMessageId = execute(message).getMessageId();
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
+    }
+
+    private void editMessage(long chatId, String newMessage) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(lastMessageId);
+        editMessageText.setText(newMessage);
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+
     }
 
     private void sendMessageWithPicture(long chatId, String textToSend, String imageUrlToSend) {
