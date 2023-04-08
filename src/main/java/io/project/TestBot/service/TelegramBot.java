@@ -123,12 +123,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
 
                     case "/help":
-                        sendMessage(chatId, HELP_TEXT);
+                        // sendMessage(chatId, HELP_TEXT);
+                        sendMessageKbHero(chatId, messageText);
                         break;
 
-                default:
-                    sendMessage(chatId, "Sorry, command wasn`t recogised! :(");
-                    break;
+                    default:
+                        sendMessage(chatId, "Sorry, command wasn`t recogised! :(");
+                        break;
+                }
             }
         }
     }
@@ -287,32 +289,31 @@ public class TelegramBot extends TelegramLongPollingBot {
      * {{инвентарь}(первая строка),{голова, торс,
      * поножи}(вторая строка)и тд}
      */
-    private ReplyKeyboardMarkup keyboard(String[][] rowArray) {
+
+    private void sendMessageKbHero(long chatId, String textToSend) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        message.enableHtml(true);
+        String[][] rowArray = { { "svрь" }, { "Голова", "Торс", "Руки", "Ноги" },
+                { "Левая рука", "Правая рука" } };
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboardRows = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
         for (int i = 0; i < rowArray.length; i++) {
-            for (int j = 0; j < rowArray[j].length; j++) {
+            for (int j = 0; j < rowArray[i].length; j++) {
                 row.add(rowArray[i][j]);
             }
             row = new KeyboardRow();
         }
+        keyboardRows.add(row);
         keyboardMarkup.setKeyboard(keyboardRows);
-        return keyboardMarkup;
-    }
-
-    private void sendMessageWithKeyboard(long chatId, String textToSend) {// возможно массив строк реализовать как
-                                                                          // параметр
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText(textToSend);
-        String[][] rowArray = { { "Инвентарь" }, { "Квас", "Торс", "Руки", "Ноги" },
-                { "Левая рука", "Правая рука" } };
-        ReplyKeyboardMarkup Keyboard = keyboard(rowArray);
-        message.setReplyMarkup(Keyboard);
+        keyboardMarkup.setOneTimeKeyboard(true);
+        keyboardMarkup.setResizeKeyboard(true);
+        message.setReplyMarkup(keyboardMarkup);
 
         try {
-            execute(message);
+            lastMessageId = execute(message).getMessageId();
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
