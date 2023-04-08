@@ -52,10 +52,10 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/help", "how to use this bot"));
 
         try {
-            this.execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
-            this.execute(new SendMessage(String.valueOf(-939824682), "Я проснувся!"));
+            execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
+            execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
+            // this.execute(new SendMessage(String.valueOf(-939824682), "Я проснувся!"));
             // this.execute(new SendMessage(String.valueOf(808370703), "Я проснувся!"));
-            this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
         } catch (TelegramApiException e) {
             log.error("Error setting bot`s command list: " + e.getMessage());
         }
@@ -78,23 +78,23 @@ public class TelegramBot extends TelegramLongPollingBot {
             long chatId = update.getMessage().getChatId();
 
             switch (messageText) {
-                case "/start":
+                case "/start", "/start@tstbtstst_bot":
                     startCommandRecieved(chatId, update.getMessage().getChat().getFirstName() + " "
                             + update.getMessage().getChat().getLastName());
                     break;
 
-                case "/timer":
+                case "/timer", "/timer@tstbtstst_bot":
                     makeTimer(chatId, 15);
                     break;
 
-                case "/register":
+                case "/register", "/register@tstbtstst_bot":
                     registerUser(update.getMessage());
                     break;
 
-                case "/command":
+                case "/command", "/command@tstbtstst_bot":
                     break;
 
-                case "/help":
+                case "/help", "/help@tstbtstst_bot":
                     sendMessage(chatId, HELP_TEXT);
                     break;
 
