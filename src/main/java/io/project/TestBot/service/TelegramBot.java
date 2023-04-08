@@ -13,11 +13,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
+import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatAdministrators;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
-import org.telegram.telegrambots.meta.api.methods.updates.GetUpdates;
 import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -39,6 +40,14 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     final BotConfig config;
 
+    private boolean waitForRequest = false;
+
+    private String currentProcess;
+
+    private int currentStep;
+
+    private String previousUserMessage = "";
+
     static final String HELP_TEXT = "Приветик!";
 
     public TelegramBot(BotConfig config) {
@@ -50,9 +59,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/help", "how to use this bot"));
         listOfCommands.add(new BotCommand("/createHero", "create your hero"));
         try {
-            this.execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
-            this.execute(new SendMessage(String.valueOf(808370703), "Я проснувся!"));
             this.execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
+            this.execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
+            // this.execute(new SendMessage(String.valueOf(808370703), "Я проснувся!"));
         } catch (TelegramApiException e) {
             log.error("Error setting bot`s command list: " + e.getMessage());
         }
@@ -72,38 +81,51 @@ public class TelegramBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
-            long chatId = update.getMessage().getChatId();
+            if (waitForRequest) {
+                waitForRequest = false;
 
-            switch (messageText) {
-                case "/start":
-                    startCommandRecieved(chatId, update.getMessage().getChat().getFirstName() + " "
-                            + update.getMessage().getChat().getLastName());
-                    break;
+                switch (currentProcess) {
+                    case "/createHero":
+                        createHero(update.getMessage(), (byte) currentStep);
+                        break;
+                    default:
+                        break;
+                }
+            } else {
+                long chatId = update.getMessage().getChatId();
 
-                case "/register":
-                    registerUser(update.getMessage());
-                    break;
+                switch (messageText) {
+                    case "/start":
+                        startCommandRecieved(chatId, update.getMessage().getChat().getFirstName() + " "
+                                + update.getMessage().getChat().getLastName());
+                        break;
 
-                case "/createHero":
-                    createHero(update.getMessage());
-                    break;
+                    case "/register":
+                        registerUser(update.getMessage());
+                        break;
 
-                case "/command":
-                    break;
+                    case "/createHero":
+                        createHero(update.getMessage(), (byte) 1);
+                        currentProcess = "/createHero";
+                        break;
 
-                case "/help":
-                    sendMessage(chatId, HELP_TEXT);
-                    break;
+                    case "/command":
+                        break;
 
-                default:
-                    sendMessage(chatId, "Sorry, command wasn`t recogised! :(");
-                    break;
+                    case "/help":
+                        sendMessage(chatId, HELP_TEXT);
+                        break;
+
+                    default:
+                        sendMessage(chatId, "Sorry, command wasn`t recogised! :(");
+                        break;
+                }
             }
         }
     }
 
     //
-    // РЕГИСТРАЦИЯ
+    // НАЧАЛО БЛОКА РЕГИСТРАЦИИ
     //
 
     private void registerUser(Message message) {
@@ -118,6 +140,23 @@ public class TelegramBot extends TelegramLongPollingBot {
             user.setFirstName(userT.getFirstName());
             user.setLastName(userT.getLastName());
 
+            boolean isAdmin = false;
+            if (message.getChat().isGroupChat()) {
+                List<ChatMember> chatMembers;
+                try {
+                    chatMembers = execute(new GetChatAdministrators(message.getChatId().toString()));
+                    for (var chatMember : chatMembers) {
+                        if (chatMember.getUser().getId() == userT.getId()) {
+                            isAdmin = true;
+                            break;
+                        }
+                    }
+                } catch (TelegramApiException e) {
+                    log.error("Error occurred: " + e.getMessage());
+                }
+            }
+            user.setIsAdmin(isAdmin);
+
             sendMessage(userT.getId(), "Введите пароль:");
             user_table.save(user);
         } else {
@@ -125,48 +164,87 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void registerHero(long userId, String name) {
-        if (user_hero.findById(userId).isEmpty()) {
-            UserHero user = new UserHero();
+    //
+    // КОНЕЦ БЛОКА РЕГИСТРАЦИИ
+    //
 
-            user.setUserId(userId);
-            user.setHeroName(name);
+    //
+    // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
+    //
 
-            user_hero.save(user);
-            sendMessage(userId, "Персонаж создан");
+    private void createHero(Message message, byte step) {
+        if (message.getChat().isUserChat()) {
+            if (user_hero.findById(message.getFrom().getId()).isEmpty()) {
+                switch (step) {
+                    case 1:
+                        sendMessage(message.getFrom().getId(),
+                                message.getChat().getFirstName() + ", давай начнем создание твоего героя!");
+                        log.info("Start creating hero " + message.getChat().getFirstName());
+                        createHero(message, (byte) 2);
+                        break;
+                    case 2:
+                        sendMessage(message.getFrom().getId(), "Каким будет его имя?");
+                        waitForRequest = true;
+                        currentStep = 3;
+                        break;
+                    case 3:
+                        previousUserMessage = message.getText();
+                        sendMessage(message.getFrom().getId(),
+                                "Имя персонажа <b><i>%s</i></b>. Вы уверены?".formatted(previousUserMessage));
+                        waitForRequest = true;
+                        currentStep = 4;
+                        break;
+                    case 4:
+                        createHero(message, previousUserMessage);
+                        break;
+                    default:
+                        break;
+                }
+            } else {
+                sendMessage(message.getFrom().getId(),
+                        "У вас уже есть персонаж <b><i>%s</i></b>!"
+                                .formatted(user_hero.findById(message.getFrom().getId()).get().getHeroName()));
+            }
         } else {
-            sendMessage(userId, "У вас уже есть персонаж!");
+            sendMessage(message.getChatId(), "Используйте эту команду в личных сообщениях с ботом!");
         }
     }
 
-    private void createHero(Message message) {
-        long chatId = message.getChatId();
-        sendMessage(chatId,
-                message.getChat().getFirstName() + " давай начнем создание твоего персонажа, какое его имя?");
-        log.info("Start creating hero" + message.getChat().getFirstName());
-
-        // получаем сообщение
-        String textToSend = "Слава";
-        sendMessage(chatId, "Имя персонажа " + textToSend + " вы уверены?");
-        // получаем сообщение
-        // присваиваем сообщение textToSend = getMessage()
-        textToSend = "Нет";
-        switch (textToSend) {
-            case "Да":
-                sendMessage(chatId, "Персонаж создан");
+    private void createHero(Message message, String heroName) {
+        switch (message.getText()) {
+            case "Да", "да":
+                registerHero(message.getFrom().getId(), heroName);
                 break;
-            case "Нет":
-                sendMessage(chatId, "Введите имя персонажа");
-                // получение сообщения
-                registerHero(message.getChat().getId(), "Слава");
+            case "Нет", "нет":
+                createHero(message, (byte) 2);
                 break;
             default:
-                sendMessage(chatId, "Неизвестная команда");
+                sendMessage(message.getFrom().getId(), "Неизвестная команда");
+                createHero(message, (byte) 2);
                 break;
         }
     }
 
-    // private void
+    private void registerHero(long userId, String name) {
+        UserHero user = new UserHero();
+
+        user.setUserId(userId);
+        user.setHeroName(name);
+        user.setForcePower(0);
+        user.setGameRole("adventurer");
+
+        user_hero.save(user);
+        sendMessage(userId, "Персонаж <b><i>%s</i></b> создан!".formatted(name));
+    }
+
+    //
+    // КОНЕЦ БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
+    //
+
+    //
+    // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
+    //
+
     private void startCommandRecieved(long chatId, String textToSend) {
         String answer = "Hi, " + textToSend + ", nice to meet you!";
         log.info("Replied to user " + textToSend);
@@ -178,6 +256,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
+        message.enableHtml(true);
 
         try {
             execute(message);
@@ -230,4 +309,8 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occurred: " + e.getMessage());
         }
     }
+
+    //
+    // КОНЕЦ БЛОКА СЛУЖБНЫХ КОМАНД
+    //
 }

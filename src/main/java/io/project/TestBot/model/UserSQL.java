@@ -11,6 +11,8 @@ public class UserSQL {
 
     private long chatId;
 
+    private boolean isAdmin;
+
     private String firstName;
 
     private String lastName;
@@ -33,6 +35,14 @@ public class UserSQL {
 
     public void setChatId(long chatId) {
         this.chatId = chatId;
+    }
+
+    public boolean getIsAdmin() {
+        return isAdmin;
+    }
+
+    public void setIsAdmin(boolean isAdmin) {
+        this.isAdmin = isAdmin;
     }
 
     public String getFirstName() {
