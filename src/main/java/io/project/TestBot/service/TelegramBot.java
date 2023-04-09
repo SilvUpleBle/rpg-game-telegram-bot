@@ -120,6 +120,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                         createHero(update.getMessage(), (byte) 1);
                         currentProcess = "/createHero";
                         break;
+                    case "/delete_user":
+                        deleteUser(update.getMessage());
+                        break;
 
                     case "/command":
                         break;
@@ -148,7 +151,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void registerUser(Message message) {
 
-        if (user_table.findById(message.getChatId()).isEmpty()) {
+        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
             User userT = message.getFrom();
 
             UserSQL user = new UserSQL();
@@ -185,6 +188,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     //
     // КОНЕЦ БЛОКА РЕГИСТРАЦИИ
     //
+
+    private void deleteUser(Message message) {
+        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
+            sendMessage(message.getChatId(), "Вы еще не зарегестрированы");
+        } else {
+            user_table.deleteById(message.getFrom().getId());
+        }
+    }
 
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
