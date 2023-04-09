@@ -30,6 +30,10 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -116,16 +120,25 @@ public class TelegramBot extends TelegramLongPollingBot {
                         createHero(update.getMessage(), (byte) 1);
                         currentProcess = "/createHero";
                         break;
+                    case "/delete_user":
+                        deleteUser(update.getMessage());
+                        break;
 
                     case "/command":
                         break;
 
                     case "/help":
                         sendMessage(chatId, HELP_TEXT);
+
                         break;
 
                     default:
-                        sendMessage(chatId, "Sorry, command wasn`t recogised! :(");
+
+                        sendMessageKbWithText(chatId, "Извините, команда не опознана :(",
+                                new String[][] { { "Инвентарь" }, { "Голова", "Торс",
+                                        "Руки", "Ноги" },
+                                        { "Левая рука", "Правая рука" } });
+
                         break;
                 }
             }
@@ -138,7 +151,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void registerUser(Message message) {
 
-        if (user_table.findById(message.getChatId()).isEmpty()) {
+        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
             User userT = message.getFrom();
 
             UserSQL user = new UserSQL();
@@ -176,6 +189,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     // КОНЕЦ БЛОКА РЕГИСТРАЦИИ
     //
 
+    private void deleteUser(Message message) {
+        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
+            sendMessage(message.getChatId(), "Вы еще не зарегестрированы");
+        } else {
+            user_table.deleteById(message.getFrom().getId());
+        }
+    }
+
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
     //
@@ -197,13 +218,18 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                     case 3:
                         previousUserMessage = message.getText();
-                        sendMessage(message.getFrom().getId(),
-                                "Имя персонажа <b><i>%s</i></b>. Вы уверены?".formatted(previousUserMessage));
+                        sendMessageKbWithText(message.getFrom().getId(),
+                                "Имя персонажа <b><i>%s</i></b>. Вы уверены?".formatted(previousUserMessage),
+                                new String[][] { { "Да", "Нет" } });
+
                         waitForRequest = true;
                         currentStep = 4;
+
                         break;
                     case 4:
+
                         createHero(message, previousUserMessage);
+
                         break;
                     default:
                         break;
@@ -229,6 +255,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             default:
                 sendMessage(message.getFrom().getId(), "Неизвестная команда");
                 createHero(message, (byte) 2);
+
                 break;
         }
     }
@@ -248,7 +275,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     //
     // КОНЕЦ БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
     //
-    
+
     //
     // ТАЙМЕР
     //
@@ -279,6 +306,87 @@ public class TelegramBot extends TelegramLongPollingBot {
         log.info("Replied to user " + textToSend);
 
         sendMessage(chatId, answer);
+    }
+
+    /*
+     * принимает массив строк где в кейборде
+     * {{инвентарь}(первая строка),{голова, торс,
+     * поножи}(вторая строка)и тд}
+     */
+
+    private void sendMessageKbWithText(long chatId, String str, String[][] arrStr) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.enableHtml(true);
+        message.setText(str);// без этого не работает
+
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setOneTimeKeyboard(true);
+
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+
+        for (int i = 0; i < arrStr.length; i++) {
+            for (int j = 0; j < arrStr[i].length; j++) {
+                row.add(arrStr[i][j]);
+            }
+            keyboardRows.add(row);
+            row = new KeyboardRow();
+        }
+
+        keyboardMarkup.setKeyboard(keyboardRows);
+
+        keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setSelective(true);
+        message.setReplyMarkup(keyboardMarkup);
+        try {
+            lastMessageId = execute(message).getMessageId();
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void sendMessageKb(long chatId, String[][] arrStr) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.enableHtml(true);
+        message.setText("");// без этого не работает
+
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setOneTimeKeyboard(true);
+        keyboardMarkup.setResizeKeyboard(true);
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+
+        keyboardMarkup.getOneTimeKeyboard();
+
+        for (int i = 0; i < arrStr.length; i++) {
+            for (int j = 0; j < arrStr[i].length; j++) {
+                row.add(arrStr[i][j]);
+            }
+            keyboardRows.add(row);
+            row = new KeyboardRow();
+        }
+
+        keyboardMarkup.setKeyboard(keyboardRows);
+        message.setReplyMarkup(keyboardMarkup);
+
+        try {
+            lastMessageId = execute(message).getMessageId();
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void DeleteKb() {
+        SendMessage message = new SendMessage();
+        message.setText("Удаляю");
+        message.setReplyMarkup(null);
+        try {
+            lastMessageId = execute(message).getMessageId();
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
     }
 
     private void sendMessage(long chatId, String textToSend) {
