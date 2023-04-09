@@ -68,8 +68,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         List<BotCommand> listOfCommands = new ArrayList<>();
         listOfCommands.add(new BotCommand("/start", "switch bot on"));
         listOfCommands.add(new BotCommand("/create_hero", "create your hero"));
-        listOfCommands.add(new BotCommand("/timer", "timer for 15 seconds"));
         listOfCommands.add(new BotCommand("/delete_hero", "delete your hero"));
+        listOfCommands.add(new BotCommand("/delete_user", "delete your user and hero"));
+        listOfCommands.add(new BotCommand("/timer", "timer for 15 seconds"));
         listOfCommands.add(new BotCommand("/help", "how to use this bot"));
         try {
             execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
@@ -118,8 +119,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                         createHero(update.getMessage(), (byte) 1);
                         currentProcess = "/create_hero";
                         break;
-                    case "/delete_user":
-                        deleteUser(update.getMessage());
+                    case "/delete_user", "/delete_user@tstbtstst_bot":
+                        deleteUser(update.getMessage().getFrom().getId());
+                        deleteHero(update.getMessage().getFrom().getId());
                         break;
 
                     case "/delete_hero", "/delete_hero@tstbtstst_bot":
@@ -143,7 +145,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
     }
-    
+
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
     //
@@ -421,7 +423,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occurred: " + e.getMessage());
         }
     }
-    
+
     //
     // ТАЙМЕР
     //
@@ -452,12 +454,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(userId, "Ваш персонаж успешно удалён!");
         }
     }
-    
-    private void deleteUser(Message message) {
-        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
-            sendMessage(message.getChatId(), "Вы еще не зарегестрированы");
+
+    private void deleteUser(long userId) {
+        if (user_table.findById(userId).isEmpty()) {
+            sendMessage(userId, "Вы еще не зарегестрированы");
         } else {
-            user_table.deleteById(message.getFrom().getId());
+            user_table.deleteById(userId);
         }
     }
 
