@@ -130,11 +130,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
 
                     default:
-                        sendMessage(chatId, "Sorry, command wasn`t recogised! :(");
 
-                        sendMessageKbWithText(chatId, "sdf", new String[][] { { "Инвентарь" }, { "Голова", "Торс",
-                                "Руки", "Ноги" },
-                                { "Левая рука", "Правая рука" } });
+                        sendMessageKbWithText(chatId, "Извините, команда не опознана :(",
+                                new String[][] { { "Инвентарь" }, { "Голова", "Торс",
+                                        "Руки", "Ноги" },
+                                        { "Левая рука", "Правая рука" } });
 
                         break;
                 }
@@ -237,16 +237,14 @@ public class TelegramBot extends TelegramLongPollingBot {
         switch (message.getText()) {
             case "Да", "да":
                 registerHero(message.getFrom().getId(), heroName);
-                DeleteKb(message);
                 break;
             case "Нет", "нет":
                 createHero(message, (byte) 2);
-                DeleteKb(message);
                 break;
             default:
                 sendMessage(message.getFrom().getId(), "Неизвестная команда");
                 createHero(message, (byte) 2);
-                DeleteKb(message);
+
                 break;
         }
     }
@@ -369,8 +367,15 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void DeleteKb(Message message) {
+    private void DeleteKb() {
+        SendMessage message = new SendMessage();
+        message.setText("Удаляю");
         message.setReplyMarkup(null);
+        try {
+            lastMessageId = execute(message).getMessageId();
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
     }
 
     private void sendMessage(long chatId, String textToSend) {
