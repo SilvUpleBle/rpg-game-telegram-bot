@@ -31,6 +31,7 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -158,8 +159,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                         makeTimer(chatId, 10);
                         break;
                     case "/help", "/help@tstbtstst_bot":
-                        sendMessage(chatId, HELP_TEXT);
-                        sendMessageIKB_YesNo(chatId);
+                        sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
+                        // sendMessageIKB_YesNo(chatId);
 
                         break;
 
@@ -193,7 +194,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case 3:
                         previousUserMessage = message.getText();
                         sendMessage(message.getFrom().getId(), "Вы уверены, что его будут звать <b><i>%s</i></b>!"
-                                .formatted(previousUserMessage));
+                                .formatted(previousUserMessage), new String[][] { { "Да", "Нет" } });
                         waitForRequest = true;
                         currentStep = 4;
                         break;
@@ -239,7 +240,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         user.setGameRole("adventurer");
 
         user_hero.save(user);
-        sendMessage(userId, "Персонаж <b><i>%s</i></b> создан!".formatted(name));
+        sendMessage(userId, "Персонаж <b><i>%s</i></b> создан!".formatted(name), new String[][] { { " " } });
         currentProcess = "";
     }
 
@@ -303,18 +304,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                 row.add(arrStr[i][j]);
             }
             keyboardRows.add(row);
-            row.clear();
+            row = new KeyboardRow();
         }
         keyboardMarkup.setKeyboard(keyboardRows);
 
-        // keyboardMarkup.setResizeKeyboard(true);
-        // keyboardMarkup.setOneTimeKeyboard(true);
-        // keyboardMarkup.setSelective(true);
+        keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setOneTimeKeyboard(true);
+        keyboardMarkup.setSelective(true);
+        sendMessage(lastMessage.getChatId(), "RPKM создан!");
         return keyboardMarkup;
-    }
-
-    private ReplyKeyboardRemove deleteReplyKeyboardMarkup() {
-        return new ReplyKeyboardRemove();
     }
 
     private void sendMessageIKB_YesNo(long chatId) {// InlineKeyboard да/нет
@@ -350,10 +348,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
         message.enableHtml(true);
-        // if (lastMessage.getReplyMarkup() != null) {
-        // log.error("Doshol do syda");
-        // message.setReplyMarkup(deleteReplyKeyboardMarkup());
-        // }
 
         try {
             lastMessage = execute(message);
@@ -369,7 +363,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setText(textToSend);
         message.enableHtml(true);
 
-        // message.setReplyMarkup(createReplyKeyboard(arrStr));
+        sendMessage(chatId, "markup = " + String.valueOf(message.getReplyMarkup()));
+        ReplyKeyboardMarkup replyKeyboardMarkup = createReplyKeyboard(arrStr);
+        message.setReplyMarkup(replyKeyboardMarkup);
 
         try {
             lastMessage = execute(message);
@@ -475,6 +471,8 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(userId, "Вы еще не зарегестрированы");
         } else {
             user_table.deleteById(userId);
+            deleteHero(userId);
+            sendMessage(userId, "Пользователь и персонаж успешно удалёны!");
         }
     }
 
