@@ -30,6 +30,11 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -58,6 +63,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     int lastMessageId;
 
+    Message lastMessage;
     // ДЛЯ ОПТИМИЗАЦИИ И ПРАВИЛЬНОГО ВЫВОДА КОМАНД НУЖНЫМ ПОЛЬЗОВАТЕЛЯМ НУЖНО
     // СОЗДАТЬ
     // MAP, КОТОРЫЙ БУДЕТ ХРАНИТЬ В СЕБЕ ID ПОЛЬЗОВАТЕЛЯ И ДЕЙСТВИЕ, КОТОРОЕ ОН
@@ -97,22 +103,24 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
 
-        if (update.hasCallbackQuery()) {
-
-            String call_data = update.getCallbackQuery().getData();
-            long message_id = update.getCallbackQuery().getMessage().getMessageId();
-            long chatId = update.getCallbackQuery().getMessage().getChatId();
-
-            if (call_data.equals("Yes")) {
-
-                CallbackQuery cb = new CallbackQuery();
-                cb.setData("message");
-                update.setCallbackQuery(cb);
-                if (update.hasMessage() && update.getMessage().hasText()) {
-                    sendMessage(chatId, cb.getData());
-                }
-            }
-        }
+        /*
+         * if (update.hasCallbackQuery()) {
+         * 
+         * String call_data = update.getCallbackQuery().getData();
+         * long message_id = update.getCallbackQuery().getMessage().getMessageId();
+         * long chatId = update.getCallbackQuery().getMessage().getChatId();
+         * 
+         * if (call_data.equals("Yes")) {
+         * 
+         * CallbackQuery cb = new CallbackQuery();
+         * cb.setData("message");
+         * update.setCallbackQuery(cb);
+         * if (update.hasMessage() && update.getMessage().hasText()) {
+         * sendMessage(chatId, cb.getData());
+         * }
+         * }
+         * }
+         */
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
@@ -142,28 +150,20 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                     case "/delete_user", "/delete_user@tstbtstst_bot":
                         deleteUser(update.getMessage().getFrom().getId());
-                        deleteHero(update.getMessage().getFrom().getId());
                         break;
-
                     case "/delete_hero", "/delete_hero@tstbtstst_bot":
                         deleteHero(update.getMessage().getFrom().getId());
                         break;
-
-
-
+                    case "/timer", "/timer@tstbtstst_bot":
+                        makeTimer(chatId, 10);
+                        break;
                     case "/help", "/help@tstbtstst_bot":
-                        sendMessage(chatId, HELP_TEXT);
-                      sendMessageIKB_YesNo(chatId);
-
+                        sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
+                        // sendMessageIKB_YesNo(chatId);
                         break;
 
                     default:
-
-                        sendMessageKbWithText(chatId, "Извините, команда не опознана :(",
-                                new String[][] { { "Инвентарь" }, { "Голова", "Торс",
-                                        "Руки", "Ноги" },
-                                        { "Левая рука", "Правая рука" } });
-
+                        sendMessage(chatId, "poshol naxui");
                         break;
                 }
             }
@@ -172,7 +172,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
-    //
+    ///
 
     private void createHero(Message message, byte step) {
         if (message.getChat().isUserChat()) {
@@ -191,16 +191,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                     case 3:
                         previousUserMessage = message.getText();
-                        sendMessageKbWithText(message.getFrom().getId(),
-                                "Имя персонажа <b><i>%s</i></b>. Вы уверены?".formatted(previousUserMessage),
-                                new String[][] { { "Да", "Нет" } });
-
+                        sendMessage(message.getFrom().getId(), "Вы уверены, что его будут звать <b><i>%s</i></b>!"
+                                .formatted(previousUserMessage), new String[][] { { "Да", "Нет" } });
                         waitForRequest = true;
                         currentStep = 4;
-
                         break;
                     case 4:
-
                         createHero(message, previousUserMessage);
                         break;
                     default:
@@ -296,18 +292,11 @@ public class TelegramBot extends TelegramLongPollingBot {
      * {{инвентарь}(первая строка),{голова, торс,
      * поножи}(вторая строка)и тд}
      */
-    private void sendMessageKbWithText(long chatId, String str, String[][] arrStr) {
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.enableHtml(true);
-        message.setText(str);// без этого не работает
-
+    private ReplyKeyboardMarkup createReplyKeyboard(String[][] arrStr) {
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        keyboardMarkup.setOneTimeKeyboard(true);
-
         List<KeyboardRow> keyboardRows = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
 
+        KeyboardRow row = new KeyboardRow();
         for (int i = 0; i < arrStr.length; i++) {
             for (int j = 0; j < arrStr[i].length; j++) {
                 row.add(arrStr[i][j]);
@@ -315,17 +304,13 @@ public class TelegramBot extends TelegramLongPollingBot {
             keyboardRows.add(row);
             row = new KeyboardRow();
         }
-
         keyboardMarkup.setKeyboard(keyboardRows);
 
         keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setOneTimeKeyboard(true);
         keyboardMarkup.setSelective(true);
-        message.setReplyMarkup(keyboardMarkup);
-        try {
-            lastMessageId = execute(message).getMessageId();
-        } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
-        }
+        sendMessage(lastMessage.getChatId(), "RPKM создан!");
+        return keyboardMarkup;
     }
 
     private void sendMessageIKB_YesNo(long chatId) {// InlineKeyboard да/нет
@@ -361,8 +346,28 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
         message.enableHtml(true);
+
         try {
-            lastMessageId = execute(message).getMessageId();
+            lastMessage = execute(message);
+            lastMessageId = lastMessage.getMessageId();
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void sendMessage(long chatId, String textToSend, String[][] arrStr) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        message.enableHtml(true);
+
+        sendMessage(chatId, "markup = " + String.valueOf(message.getReplyMarkup()));
+        ReplyKeyboardMarkup replyKeyboardMarkup = createReplyKeyboard(arrStr);
+        message.setReplyMarkup(replyKeyboardMarkup);
+
+        try {
+            lastMessage = execute(message);
+            lastMessageId = lastMessage.getMessageId();
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
@@ -464,6 +469,8 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(userId, "Вы еще не зарегестрированы");
         } else {
             user_table.deleteById(userId);
+            deleteHero(userId);
+            sendMessage(userId, "Ваш Бог успешно удалёны!");
         }
     }
 
