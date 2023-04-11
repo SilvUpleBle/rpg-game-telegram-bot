@@ -470,7 +470,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         } else {
             user_table.deleteById(userId);
             deleteHero(userId);
-            sendMessage(userId, "Пользователь и персонаж успешно удалёны!");
+            sendMessage(userId, "Ваш Бог успешно удалёны!");
         }
     }
 
