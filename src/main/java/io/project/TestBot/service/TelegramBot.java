@@ -35,6 +35,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +64,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     int lastMessageId;
 
     Message lastMessage;
-
     // ДЛЯ ОПТИМИЗАЦИИ И ПРАВИЛЬНОГО ВЫВОДА КОМАНД НУЖНЫМ ПОЛЬЗОВАТЕЛЯМ НУЖНО
     // СОЗДАТЬ
     // MAP, КОТОРЫЙ БУДЕТ ХРАНИТЬ В СЕБЕ ID ПОЛЬЗОВАТЕЛЯ И ДЕЙСТВИЕ, КОТОРОЕ ОН
@@ -150,7 +150,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                     case "/delete_user", "/delete_user@tstbtstst_bot":
                         deleteUser(update.getMessage().getFrom().getId());
-                        deleteHero(update.getMessage().getFrom().getId());
                         break;
                     case "/delete_hero", "/delete_hero@tstbtstst_bot":
                         deleteHero(update.getMessage().getFrom().getId());
@@ -161,7 +160,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/help", "/help@tstbtstst_bot":
                         sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
                         // sendMessageIKB_YesNo(chatId);
-
                         break;
 
                     default:
@@ -174,7 +172,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
-    //
+    ///
 
     private void createHero(Message message, byte step) {
         if (message.getChat().isUserChat()) {
@@ -240,7 +238,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         user.setGameRole("adventurer");
 
         user_hero.save(user);
-        sendMessage(userId, "Персонаж <b><i>%s</i></b> создан!".formatted(name), new String[][] { { " " } });
+        sendMessage(userId, "Персонаж <b><i>%s</i></b> создан!".formatted(name));
         currentProcess = "";
     }
 
