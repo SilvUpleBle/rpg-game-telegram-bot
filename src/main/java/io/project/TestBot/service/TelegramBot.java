@@ -15,10 +15,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
-import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatAdministrators;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
-import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChat.GetChatBuilder;
-import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChat;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
@@ -26,8 +23,6 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageTe
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.Chat;
-import org.telegram.telegrambots.meta.api.objects.ChatPermissions;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -35,10 +30,7 @@ import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import lombok.extern.slf4j.Slf4j;
@@ -66,13 +58,21 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     int lastMessageId;
 
+    // ДЛЯ ОПТИМИЗАЦИИ И ПРАВИЛЬНОГО ВЫВОДА КОМАНД НУЖНЫМ ПОЛЬЗОВАТЕЛЯМ НУЖНО
+    // СОЗДАТЬ
+    // MAP, КОТОРЫЙ БУДЕТ ХРАНИТЬ В СЕБЕ ID ПОЛЬЗОВАТЕЛЯ И ДЕЙСТВИЕ, КОТОРОЕ ОН
+    // ВЫПОЛНЯЕТ В ДАННЫЙ МОМЕНТ
+    // ТАКЖЕ, ВОЗМОЖНО, НУЖНО БУДЕТ ХРАНИТЬ КАК-ТО ШАГ, НА КОТОРОМ ПОЛЬЗОВАТЕЛЬ
+    // ОСТАНОВИЛСЯ, ТАК ЧТО МОЖЕТ ПОТРЕБОВАТЬСЯ БД
+
     public TelegramBot(BotConfig config) {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
-        listOfCommands.add(new BotCommand("/start", "switch bot on"));
+        // listOfCommands.add(new BotCommand("/start", "switch bot on"));
         listOfCommands.add(new BotCommand("/create_hero", "create your hero"));
-        listOfCommands.add(new BotCommand("/timer", "timer for 15 seconds"));
         listOfCommands.add(new BotCommand("/delete_hero", "delete your hero"));
+        listOfCommands.add(new BotCommand("/delete_user", "delete your user and hero"));
+        listOfCommands.add(new BotCommand("/timer", "timer for 15 seconds"));
         listOfCommands.add(new BotCommand("/help", "how to use this bot"));
         try {
             execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
@@ -130,17 +130,19 @@ public class TelegramBot extends TelegramLongPollingBot {
                 long chatId = update.getMessage().getChatId();
 
                 switch (messageText) {
-                    case "/start", "/start@tstbtstst_bot":
-                        startCommandRecieved(chatId, update.getMessage().getFrom().getFirstName() + " "
-                                + update.getMessage().getFrom().getLastName());
+                    //
+                    // ТУТ БЫЛ /start, НО Я НЕ УВЕРЕН, ЧТО ОН ВООБЩЕ НУЖЕН
+                    //
+                    case "/create_user", "/create_user@tstbtstst_bot":
+                        createUser(update.getMessage());
                         break;
-
                     case "/create_hero", "/create_hero@tstbtstst_bot":
                         createHero(update.getMessage(), (byte) 1);
                         currentProcess = "/create_hero";
                         break;
-                    case "/delete_user":
-                        deleteUser(update.getMessage());
+                    case "/delete_user", "/delete_user@tstbtstst_bot":
+                        deleteUser(update.getMessage().getFrom().getId());
+                        deleteHero(update.getMessage().getFrom().getId());
                         break;
 
                     case "/delete_hero", "/delete_hero@tstbtstst_bot":
@@ -167,68 +169,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
     }
-
-
-    //
-    // НАЧАЛО БЛОКА РЕГИСТРАЦИИ
-    //
-
-    private void registerUser(Message message) {
-
-        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
-            User userT = message.getFrom();
-
-            UserSQL user = new UserSQL();
-            user.setUserId(userT.getId());
-            user.setChatId(message.getChatId());
-            user.setUserName(userT.getUserName());
-            user.setFirstName(userT.getFirstName());
-            user.setLastName(userT.getLastName());
-
-            boolean isAdmin = false;
-            if (message.getChat().isGroupChat()) {
-                List<ChatMember> chatMembers;
-                try {
-                    chatMembers = execute(new GetChatAdministrators(message.getChatId().toString()));
-                    for (var chatMember : chatMembers) {
-                        if (chatMember.getUser().getId() == userT.getId()) {
-                            isAdmin = true;
-                            break;
-                        }
-                    }
-                } catch (TelegramApiException e) {
-                    log.error("Error occurred: " + e.getMessage());
-                }
-            }
-            user.setIsAdmin(isAdmin);
-
-            sendMessage(userT.getId(), "Введите пароль:");
-            user_table.save(user);
-        } else {
-            sendMessage(message.getChatId(), "Вы уже зарегистрированы!");
-        }
-    }
-
-    //
-    // КОНЕЦ БЛОКА РЕГИСТРАЦИИ
-    //
-
-    //
-    // НАЧАЛО БЛОКА УДАЛЕНИЙ
-    //
-    private void deleteUser(Message message) {
-        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
-            sendMessage(message.getChatId(), "Вы еще не зарегестрированы");
-        } else {
-            user_table.deleteById(message.getFrom().getId());
-        }
-    }
-
-
- 
-    //
-    // КОНЕЦ БЛОКА УДАЛЕНИЙ
-    //
 
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
@@ -262,7 +202,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case 4:
 
                         createHero(message, previousUserMessage);
-                        registerUser(message);
                         break;
                     default:
                         break;
@@ -307,7 +246,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         currentProcess = "";
     }
 
-    private void registerUser(Message message) {
+    private void createUser(Message message) {
 
         if (user_table.findById(message.getChatId()).isEmpty()) {
             User userT = message.getFrom();
@@ -334,7 +273,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             }
             user_table.save(user);
-            sendMessage(message.getChatId(), "Вы были успешно зарегистрированы!");
+            sendMessage(message.getChatId(),
+                    "Приветствуйте нового бога в нашем мире! Имя ему <b><i>%s</i></b>".formatted(userT.getUserName()));
+            sendMessage(message.getFrom().getId(),
+                    "И какой же Вы бог, о Великий, если у Вас нет героя? Ну же! Вперёд! Давайте создадим его!");
+            // тут под сообщением нужно кнопочку добаваить "создать героя"!!
         } else {
             sendMessage(message.getChatId(), "Вы уже зарегистрированы!");
         }
@@ -348,13 +291,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
     //
 
-    private void startCommandRecieved(long chatId, String textToSend) {
-        String answer = "Hi, " + textToSend + ", nice to meet you!";
-        log.info("Replied to user " + textToSend);
-
-        sendMessage(chatId, answer);
-    }
-
+    /*
+     * принимает массив строк где в кейборде
+     * {{инвентарь}(первая строка),{голова, торс,
+     * поножи}(вторая строка)и тд}
+     */
     private void sendMessageKbWithText(long chatId, String str, String[][] arrStr) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -486,7 +427,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occurred: " + e.getMessage());
         }
     }
-    
+
     //
     // ТАЙМЕР
     //
@@ -517,12 +458,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(userId, "Ваш персонаж успешно удалён!");
         }
     }
-    
-    private void deleteUser(Message message) {
-        if (user_table.findById(message.getFrom().getId()).isEmpty()) {
-            sendMessage(message.getChatId(), "Вы еще не зарегестрированы");
+
+    private void deleteUser(long userId) {
+        if (user_table.findById(userId).isEmpty()) {
+            sendMessage(userId, "Вы еще не зарегестрированы");
         } else {
-            user_table.deleteById(message.getFrom().getId());
+            user_table.deleteById(userId);
         }
     }
 
