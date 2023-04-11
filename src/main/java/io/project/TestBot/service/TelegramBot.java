@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
@@ -21,6 +22,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -94,6 +96,24 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+
+        if (update.hasCallbackQuery()) {
+
+            String call_data = update.getCallbackQuery().getData();
+            long message_id = update.getCallbackQuery().getMessage().getMessageId();
+            long chatId = update.getCallbackQuery().getMessage().getChatId();
+
+            if (call_data.equals("Yes")) {
+
+                CallbackQuery cb = new CallbackQuery();
+                cb.setData("message");
+                update.setCallbackQuery(cb);
+                if (update.hasMessage() && update.getMessage().hasText()) {
+                    sendMessage(chatId, cb.getData());
+                }
+            }
+        }
+
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             if (waitForRequest) {
@@ -129,8 +149,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                         deleteHero(update.getMessage().getFrom().getId());
                         break;
 
+
+
                     case "/help", "/help@tstbtstst_bot":
                         sendMessage(chatId, HELP_TEXT);
+                      sendMessageIKB_YesNo(chatId);
 
                         break;
 
@@ -273,7 +296,6 @@ public class TelegramBot extends TelegramLongPollingBot {
      * {{инвентарь}(первая строка),{голова, торс,
      * поножи}(вторая строка)и тд}
      */
-
     private void sendMessageKbWithText(long chatId, String str, String[][] arrStr) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -306,42 +328,27 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendMessageKb(long chatId, String[][] arrStr) {
+    private void sendMessageIKB_YesNo(long chatId) {// InlineKeyboard да/нет
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
+        message.setText("InlineKeyboard");
         message.enableHtml(true);
-        message.setText("");// без этого не работает
 
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        keyboardMarkup.setOneTimeKeyboard(true);
-        keyboardMarkup.setResizeKeyboard(true);
-        List<KeyboardRow> keyboardRows = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        List<InlineKeyboardButton> rowInline = new ArrayList<>();
+        InlineKeyboardButton ikb = new InlineKeyboardButton();
+        ikb.setText("Да");
+        ikb.setCallbackData("Yes");
+        rowInline.add(ikb);
+        ikb = new InlineKeyboardButton();
+        ikb.setText("Нет");
+        ikb.setCallbackData("No");
+        rowInline.add(ikb);
+        rowsInline.add(rowInline);
 
-        keyboardMarkup.getOneTimeKeyboard();
-
-        for (int i = 0; i < arrStr.length; i++) {
-            for (int j = 0; j < arrStr[i].length; j++) {
-                row.add(arrStr[i][j]);
-            }
-            keyboardRows.add(row);
-            row = new KeyboardRow();
-        }
-
-        keyboardMarkup.setKeyboard(keyboardRows);
-        message.setReplyMarkup(keyboardMarkup);
-
-        try {
-            lastMessageId = execute(message).getMessageId();
-        } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
-        }
-    }
-
-    private void DeleteKb() {
-        SendMessage message = new SendMessage();
-        message.setText("Удаляю");
-        message.setReplyMarkup(null);
+        markupInline.setKeyboard(rowsInline);
+        message.setReplyMarkup(markupInline);
         try {
             lastMessageId = execute(message).getMessageId();
         } catch (TelegramApiException e) {
