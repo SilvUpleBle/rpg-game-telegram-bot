@@ -135,9 +135,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                     case "/register":
                         registerUser(update.getMessage());
+
                         break;
 
-                    case "/createHero":
+                    case "/create_hero":
                         createHero(update.getMessage(), (byte) 1);
                         currentProcess = "/createHero";
                         break;
@@ -218,6 +219,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(message.getChatId(), "Вы еще не зарегестрированы");
         } else {
             user_table.deleteById(message.getFrom().getId());
+            sendMessage(message.getChatId(), "Пользователь удален");
         }
     }
 
