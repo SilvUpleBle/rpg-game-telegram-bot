@@ -149,7 +149,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
-    //
+    ///
 
     private void createHero(Message message, byte step) {
         if (message.getChat().isUserChat()) {
