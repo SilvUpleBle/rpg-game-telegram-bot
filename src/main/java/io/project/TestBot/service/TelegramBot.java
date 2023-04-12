@@ -2,7 +2,9 @@ package io.project.TestBot.service;
 
 import io.project.TestBot.config.BotConfig;
 import io.project.TestBot.model.UserSQL;
+import io.project.TestBot.model.UserState;
 import io.project.TestBot.model.User_hero;
+import io.project.TestBot.model.User_state;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
@@ -45,17 +47,13 @@ import lombok.extern.slf4j.Slf4j;
 public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
+    private User_state user_state;
+    @Autowired
     private User_table user_table;
     @Autowired
     private User_hero user_hero;
 
     final BotConfig config;
-
-    private boolean waitForRequest = false;
-
-    private String currentProcess;
-
-    private int currentStep;
 
     private String previousUserMessage = "";
 
@@ -74,8 +72,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     public TelegramBot(BotConfig config) {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
-        // listOfCommands.add(new BotCommand("/start", "switch bot on"));
         listOfCommands.add(new BotCommand("/create_hero", "create your hero"));
+        listOfCommands.add(new BotCommand("/create_user", "create your god"));
         listOfCommands.add(new BotCommand("/delete_hero", "delete your hero"));
         listOfCommands.add(new BotCommand("/delete_user", "delete your user and hero"));
         listOfCommands.add(new BotCommand("/timer", "timer for 15 seconds"));
@@ -121,15 +119,25 @@ public class TelegramBot extends TelegramLongPollingBot {
          * }
          * }
          */
+        UserState user;
+        if (user_state.findById(update.getMessage().getFrom().getId()).isEmpty()) {
+            user = new UserState();
+            user.setUserId(update.getMessage().getFrom().getId());
+            user.setWaitForRequest(false);
+
+            user_state.save(user);
+        } else {
+            user = user_state.findById(update.getMessage().getFrom().getId()).get();
+        }
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
-            if (waitForRequest) {
-                waitForRequest = false;
+            if (user.getWaitForRequest()) {
+                user.setWaitForRequest(false);
 
-                switch (currentProcess) {
+                switch (user.getFunction()) {
                     case "/create_hero":
-                        createHero(update.getMessage(), (byte) currentStep);
+                        createHero(update.getMessage(), user.getStep());
                         break;
                     default:
                         break;
@@ -137,34 +145,45 @@ public class TelegramBot extends TelegramLongPollingBot {
             } else {
                 long chatId = update.getMessage().getChatId();
 
-                switch (messageText) {
-                    //
-                    // ТУТ БЫЛ /start, НО Я НЕ УВЕРЕН, ЧТО ОН ВООБЩЕ НУЖЕН
-                    //
-                    case "/create_user", "/create_user@tstbtstst_bot":
-                        createUser(update.getMessage());
-                        break;
-                    case "/create_hero", "/create_hero@tstbtstst_bot":
-                        createHero(update.getMessage(), (byte) 1);
-                        currentProcess = "/create_hero";
-                        break;
-                    case "/delete_user", "/delete_user@tstbtstst_bot":
-                        deleteUser(update.getMessage().getFrom().getId());
-                        break;
-                    case "/delete_hero", "/delete_hero@tstbtstst_bot":
-                        deleteHero(update.getMessage().getFrom().getId());
-                        break;
-                    case "/timer", "/timer@tstbtstst_bot":
-                        makeTimer(chatId, 10);
-                        break;
-                    case "/help", "/help@tstbtstst_bot":
-                        sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
-                        // sendMessageIKB_YesNo(chatId);
-                        break;
+                if (user.getFunction().isEmpty()) {
 
-                    default:
-                        sendMessage(chatId, "poshol naxui");
-                        break;
+                    switch (messageText) {
+                        //
+                        // ТУТ БЫЛ /start, НО Я НЕ УВЕРЕН, ЧТО ОН ВООБЩЕ НУЖЕН
+                        //
+                        case "/create_user", "/create_user@tstbtstst_bot":
+                            createUser(update.getMessage());
+                            break;
+                        case "/create_hero", "/create_hero@tstbtstst_bot":
+                            user.setFunction("/create_hero");
+                            createHero(update.getMessage(), (byte) 1);
+                            break;
+                        case "/delete_user", "/delete_user@tstbtstst_bot":
+                            deleteHero(update.getMessage().getFrom().getId());
+                            deleteUser(update.getMessage().getFrom().getId());
+                            break;
+                        case "/delete_hero", "/delete_hero@tstbtstst_bot":
+                            deleteHero(update.getMessage().getFrom().getId());
+                            break;
+                        case "/timer", "/timer@tstbtstst_bot":
+                            user.setFunction("/timer");
+                            makeTimer(chatId, 15);
+                            user.setFunction(null);
+                            break;
+                        case "/cancel", "/cancel@tstbtstst_bot":
+                            user.setFunction(null);
+                            user.setStep((byte) 0);
+                            break;
+                        case "/help", "/help@tstbtstst_bot":
+                            sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
+                            break;
+
+                        default:
+                            sendMessage(chatId, "Не понимаю команду!");
+                            break;
+                    }
+                } else {
+                    sendMessage(chatId, "Ещё не закончено выполнение предыдущей функции!");
                 }
             }
         }
@@ -176,6 +195,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void createHero(Message message, byte step) {
         if (message.getChat().isUserChat()) {
+            if (user_table.findById(message.getFrom().getId()).isEmpty()) {
+                sendMessage(message.getFrom().getId(), "Сперва создатей своего Бога, используя /create_user!");
+                return;
+            }
+            UserState user = user_state.findById(message.getFrom().getId()).get();
             if (user_hero.findById(message.getFrom().getId()).isEmpty()) {
                 switch (step) {
                     case 1:
@@ -186,15 +210,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                     case 2:
                         sendMessage(message.getFrom().getId(), "Каким будет его имя?");
-                        waitForRequest = true;
-                        currentStep = 3;
+                        user.setWaitForRequest(true);
+                        user.setStep((byte) 3);
                         break;
                     case 3:
                         previousUserMessage = message.getText();
                         sendMessage(message.getFrom().getId(), "Вы уверены, что его будут звать <b><i>%s</i></b>!"
                                 .formatted(previousUserMessage), new String[][] { { "Да", "Нет" } });
-                        waitForRequest = true;
-                        currentStep = 4;
+                        user.setWaitForRequest(true);
+                        user.setStep((byte) 4);
                         break;
                     case 4:
                         createHero(message, previousUserMessage);
@@ -203,7 +227,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         break;
                 }
             } else {
-                currentProcess = "";
+                user.setFunction(null);
                 sendMessage(message.getFrom().getId(),
                         "У вас уже есть персонаж <b><i>%s</i></b>!"
                                 .formatted(user_hero.findById(message.getFrom().getId()).get().getHeroName()));
@@ -239,7 +263,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         user_hero.save(user);
         sendMessage(userId, "Персонаж <b><i>%s</i></b> создан!".formatted(name));
-        currentProcess = "";
+
+        user_state.findById(userId).get().setFunction(null);
+        user_state.findById(userId).get().setStep((byte) 0);
     }
 
     private void createUser(Message message) {
@@ -309,7 +335,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         keyboardMarkup.setResizeKeyboard(true);
         keyboardMarkup.setOneTimeKeyboard(true);
         keyboardMarkup.setSelective(true);
-        sendMessage(lastMessage.getChatId(), "RPKM создан!");
         return keyboardMarkup;
     }
 
@@ -360,10 +385,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
         message.enableHtml(true);
-
-        sendMessage(chatId, "markup = " + String.valueOf(message.getReplyMarkup()));
-        ReplyKeyboardMarkup replyKeyboardMarkup = createReplyKeyboard(arrStr);
-        message.setReplyMarkup(replyKeyboardMarkup);
+        message.setReplyMarkup(createReplyKeyboard(arrStr));
 
         try {
             lastMessage = execute(message);
@@ -469,8 +491,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(userId, "Вы еще не зарегестрированы");
         } else {
             user_table.deleteById(userId);
-            deleteHero(userId);
-            sendMessage(userId, "Пользователь и персонаж успешно удалёны!");
+            sendMessage(userId, "Ваш Бог успешно удалёны!");
         }
     }
 
