@@ -20,7 +20,7 @@ public class UserHero {
      * 13 inventory(string of items i
      */
     @Id
-    private long userId;
+    private Long userId;
 
     private String heroName;
 

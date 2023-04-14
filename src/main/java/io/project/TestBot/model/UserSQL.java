@@ -7,7 +7,7 @@ import jakarta.persistence.Id;
 public class UserSQL {
 
     @Id
-    private long userId;
+    private Long userId;
 
     private long chatId;
 
