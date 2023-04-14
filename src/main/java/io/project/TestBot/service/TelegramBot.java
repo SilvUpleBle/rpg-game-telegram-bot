@@ -1,20 +1,21 @@
-Skip to content Search or jump to…Pull requests Issues Codespaces Marketplace Explore
-
-@SlavaNoBugs SilvUpleBle/rpg-game-telegram-bot Private Fork your own copy of SilvUpleBle/rpg-game-telegram-bot Code Issues Pull requests Actions Projects Security Insights rpg-game-telegram-bot/src/main/java/io/project/TestBot/service/TelegramBot.java/@SilvUpleBle SilvUpleBle Merge branch'main'into Andrei`s_branch Latest commit 69d a8e5 24 minutes ago History 2 contributors @SilvUpleBle @SlavaNoBugs 480 lines(415 sloc)19 KB
 
 package io.project.TestBot.service;
 
 import io.project.TestBot.config.BotConfig;
 import io.project.TestBot.model.UserSQL;
 import io.project.TestBot.model.User_hero;
+import io.project.TestBot.model.TaskSQL;
+import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties.Data;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
@@ -52,6 +53,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     private User_table user_table;
     @Autowired
     private User_hero user_hero;
+    @Autowired
+    private Task_table task_table;
 
     final BotConfig config;
 
@@ -135,6 +138,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/create_hero":
                         createHero(update.getMessage(), (byte) currentStep);
                         break;
+                    case "/create_task":
+                        createTask(update.getMessage(), (byte) currentStep);
+                        break;
                     default:
                         break;
                 }
@@ -165,9 +171,18 @@ public class TelegramBot extends TelegramLongPollingBot {
                         sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
                         // sendMessageIKB_YesNo(chatId);
                         break;
+                    case "/create_task", "/create_task@tstbtstst_bot":
+                        createTask(update.getMessage(), (byte) 1);
+                        currentProcess = "/create_task";
+                        break;
+                    case "/get_rights", "/get_rights@tstbtstst_bot":
+
+                        getAdminRights(update.getMessage());
+                        break;
 
                     default:
                         sendMessage(chatId, "poshol naxui");
+                        // sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
                         break;
                 }
             }
@@ -187,6 +202,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                                 message.getChat().getFirstName() + ", давай начнем создание твоего героя!");
                         log.info("Start creating hero " + message.getChat().getFirstName());
                         createHero(message, (byte) 2);
+
                         break;
                     case 2:
                         sendMessage(message.getFrom().getId(), "Каким будет его имя?");
@@ -296,6 +312,79 @@ public class TelegramBot extends TelegramLongPollingBot {
      * {{инвентарь}(первая строка),{голова, торс,
      * поножи}(вторая строка)и тд}
      */
+    private void getAdminRights(Message message) {
+        UserSQL userSQL = new UserSQL();
+        userSQL.setIsAdmin(true);
+        sendMessage(message.getChatId(), "Права получены");
+        user_table.save(userSQL);
+
+    }
+
+    private void createTask(Message message, byte step) {
+
+        if (message.getChat().isUserChat()) {
+            if (!user_table.findById(message.getFrom().getId()).isEmpty()) {
+                if (!user_table.findById(message.getFrom().getId()).get().getIsAdmin() == true) {
+
+                    switch (step) {
+                        case 1:
+                            sendMessage(message.getFrom().getId(),
+                                    message.getChat().getFirstName() + ", приступим к созданию задания");
+                            log.info("Start creating hero " + message.getChat().getFirstName());
+                            createTask(message, (byte) 2);
+                            break;
+                        case 2:
+                            sendMessage(message.getFrom().getId(),
+                                    "Введите название задания и через пробел его описание");
+                            waitForRequest = true;
+                            currentStep = 3;
+                            break;
+                        case 3:
+                            previousUserMessage = message.getText();
+                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
+                                    .formatted(previousUserMessage), new String[][] { { "Да", "Нет" } });
+                            waitForRequest = true;
+                            currentStep = 4;
+                            break;
+                        case 4:
+                            switch (message.getText()) {
+                                case "Да", "да":
+                                    TaskSQL task = new TaskSQL();
+                                    String[] arr = previousUserMessage.split(" ");
+
+                                    task.setTaskId(ThreadLocalRandom.current().nextLong(1000000, 10000000));
+                                    task.setCreatorId(message.getFrom().getId());
+                                    task.setTaskDescription(arr[0]);
+                                    task.setTaskName(arr[1]);
+                                    task.setTaskType(new String("real life task"));
+                                    sendMessage(message.getFrom().getId(), "Создание окончено!");
+                                    task_table.save(task);
+                                    break;
+                                case "Нет", "нет":
+                                    createTask(message, (byte) 2);
+                                    break;
+                                default:
+                                    break;
+                            }
+
+                            break;
+
+                        default:
+                            break;
+                    }
+                } else {
+                    sendMessage(message.getChatId(), "Вы не администратор");
+                }
+            } else {
+                currentProcess = "";
+                sendMessage(message.getFrom().getId(), "Вы не зарегестрированны");
+            }
+        } else {
+            sendMessage(message.getChatId(), "Используйте эту команду в личных сообщениях с ботом!");
+        }
+
+    }
+
     private ReplyKeyboardMarkup createReplyKeyboard(String[][] arrStr) {
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboardRows = new ArrayList<>();
