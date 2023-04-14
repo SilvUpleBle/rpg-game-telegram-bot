@@ -3,7 +3,9 @@ package io.project.TestBot.service;
 
 import io.project.TestBot.config.BotConfig;
 import io.project.TestBot.model.UserSQL;
+import io.project.TestBot.model.UserState;
 import io.project.TestBot.model.User_hero;
+import io.project.TestBot.model.User_state;
 import io.project.TestBot.model.TaskSQL;
 import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
@@ -50,6 +52,8 @@ import lombok.extern.slf4j.Slf4j;
 public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
+    private User_state user_state;
+    @Autowired
     private User_table user_table;
     @Autowired
     private User_hero user_hero;
@@ -58,35 +62,18 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     final BotConfig config;
 
-    private boolean waitForRequest = false;
-
-    private String currentProcess;
-
-    private int currentStep;
-
-    private String previousUserMessage = "";
-
-    static final String HELP_TEXT = "Приветик!";
-
-    int lastMessageId;
-
-    Message lastMessage;
-    // ДЛЯ ОПТИМИЗАЦИИ И ПРАВИЛЬНОГО ВЫВОДА КОМАНД НУЖНЫМ ПОЛЬЗОВАТЕЛЯМ НУЖНО
-    // СОЗДАТЬ
-    // MAP, КОТОРЫЙ БУДЕТ ХРАНИТЬ В СЕБЕ ID ПОЛЬЗОВАТЕЛЯ И ДЕЙСТВИЕ, КОТОРОЕ ОН
-    // ВЫПОЛНЯЕТ В ДАННЫЙ МОМЕНТ
-    // ТАКЖЕ, ВОЗМОЖНО, НУЖНО БУДЕТ ХРАНИТЬ КАК-ТО ШАГ, НА КОТОРОМ ПОЛЬЗОВАТЕЛЬ
-    // ОСТАНОВИЛСЯ, ТАК ЧТО МОЖЕТ ПОТРЕБОВАТЬСЯ БД
+    static final String HELP_TEXT = "help text";
 
     public TelegramBot(BotConfig config) {
         this.config = config;
         List<BotCommand> listOfCommands = new ArrayList<>();
-        // listOfCommands.add(new BotCommand("/start", "switch bot on"));
-        listOfCommands.add(new BotCommand("/create_hero", "create your hero"));
-        listOfCommands.add(new BotCommand("/delete_hero", "delete your hero"));
-        listOfCommands.add(new BotCommand("/delete_user", "delete your user and hero"));
-        listOfCommands.add(new BotCommand("/timer", "timer for 15 seconds"));
-        listOfCommands.add(new BotCommand("/help", "how to use this bot"));
+        listOfCommands.add(new BotCommand("/create_hero", "создать героя"));
+        listOfCommands.add(new BotCommand("/create_user", "создать пользователя"));
+        listOfCommands.add(new BotCommand("/delete_hero", "удалить героя"));
+        listOfCommands.add(new BotCommand("/delete_user", "удалить пользователя и героя"));
+        listOfCommands.add(new BotCommand("/timer", "таймер на 15 секунд"));
+        listOfCommands.add(new BotCommand("/cancel", "сбросить текущее состояние пользователя"));
+        listOfCommands.add(new BotCommand("/help", "вывести help-сообщение"));
         try {
             execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
             execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
@@ -128,15 +115,28 @@ public class TelegramBot extends TelegramLongPollingBot {
          * }
          * }
          */
+        UserState user = new UserState();
+        if (user_state.findById(update.getMessage().getFrom().getId()).isEmpty()) {
+            user.setUserId(update.getMessage().getFrom().getId());
+            user.setWaitForRequest(false);
+            user.setStep(0);
+
+            user_state.save(user);
+        } else {
+            user = user_state.findById(update.getMessage().getFrom().getId()).get();
+        }
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
-            if (waitForRequest) {
-                waitForRequest = false;
 
-                switch (currentProcess) {
+            if (user.getWaitForRequest()
+                    && (!messageText.equals("/cancel") || messageText.equals("/cancel@tstbtstst_bot"))) {
+                user.setWaitForRequest(false);
+                user_state.save(user);
+
+                switch (user.getProcess()) {
                     case "/create_hero":
-                        createHero(update.getMessage(), (byte) currentStep);
+                        createHero(update.getMessage(), (byte) user.getStep());
                         break;
                     case "/create_task":
                         createTask(update.getMessage(), (byte) currentStep);
@@ -146,44 +146,58 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
             } else {
                 long chatId = update.getMessage().getChatId();
+                if (messageText.equals("/cancel") || user.getProcess() == null
+                        || messageText.equals("/cancel@tstbtstst_bot")) {
+                    switch (messageText) {
+                        //
+                        // ТУТ БЫЛ /start, НО Я НЕ УВЕРЕН, ЧТО ОН ВООБЩЕ НУЖЕН
+                        //
+                        case "/create_user", "/create_user@tstbtstst_bot":
+                            createUser(update.getMessage());
+                            break;
+                        case "/create_hero", "/create_hero@tstbtstst_bot":
+                            user.setProcess("/create_hero");
+                            user_state.save(user);
+                            createHero(update.getMessage(), (byte) 1);
+                            break;
+                        case "/delete_user", "/delete_user@tstbtstst_bot":
+                            deleteHero(update.getMessage().getFrom().getId());
+                            deleteUser(update.getMessage().getFrom().getId());
+                            break;
+                        case "/delete_hero", "/delete_hero@tstbtstst_bot":
+                            deleteHero(update.getMessage().getFrom().getId());
+                            break;
+                        case "/timer", "/timer@tstbtstst_bot":
+                            user.setProcess("/timer");
+                            user_state.save(user);
+                            makeTimer(chatId, 15);
+                            user.setProcess(null);
+                            user_state.save(user);
+                            break;
+                        case "/cancel", "/cancel@tstbtstst_bot":
+                            user.setProcess(null);
+                            user.setStep((byte) 0);
+                            user.setWaitForRequest(false);
+                            user_state.save(user);
+                            break;
+                        case "/help", "/help@tstbtstst_bot":
+                            sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
+                            break;
+                        case "/create_task", "/create_task@tstbtstst_bot":
+                            createTask(update.getMessage(), (byte) 1);
+                            currentProcess = "/create_task";
+                            break;
+                        case "/get_rights", "/get_rights@tstbtstst_bot":
 
-                switch (messageText) {
-                    //
-                    // ТУТ БЫЛ /start, НО Я НЕ УВЕРЕН, ЧТО ОН ВООБЩЕ НУЖЕН
-                    //
-                    case "/create_user", "/create_user@tstbtstst_bot":
-                        createUser(update.getMessage());
-                        break;
-                    case "/create_hero", "/create_hero@tstbtstst_bot":
-                        createHero(update.getMessage(), (byte) 1);
-                        currentProcess = "/create_hero";
-                        break;
-                    case "/delete_user", "/delete_user@tstbtstst_bot":
-                        deleteUser(update.getMessage().getFrom().getId());
-                        break;
-                    case "/delete_hero", "/delete_hero@tstbtstst_bot":
-                        deleteHero(update.getMessage().getFrom().getId());
-                        break;
-                    case "/timer", "/timer@tstbtstst_bot":
-                        makeTimer(chatId, 10);
-                        break;
-                    case "/help", "/help@tstbtstst_bot":
-                        sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
-                        // sendMessageIKB_YesNo(chatId);
-                        break;
-                    case "/create_task", "/create_task@tstbtstst_bot":
-                        createTask(update.getMessage(), (byte) 1);
-                        currentProcess = "/create_task";
-                        break;
-                    case "/get_rights", "/get_rights@tstbtstst_bot":
+                            getAdminRights(update.getMessage());
+                            break;
 
-                        getAdminRights(update.getMessage());
-                        break;
-
-                    default:
-                        sendMessage(chatId, "poshol naxui");
-                        // sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
-                        break;
+                        default:
+                            sendMessage(chatId, "Не понимаю команду!");
+                            break;
+                    }
+                } else {
+                    sendMessage(chatId, "Ещё не закончено выполнение предыдущей функции!");
                 }
             }
         }
@@ -194,7 +208,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     ///
 
     private void createHero(Message message, byte step) {
+        UserState user = user_state.findById(message.getFrom().getId()).get();
         if (message.getChat().isUserChat()) {
+            if (user_table.findById(message.getFrom().getId()).isEmpty()) {
+                sendMessage(message.getFrom().getId(), "Сперва создайте своего Бога, используя /create_user!");
+                user.setProcess(null);
+                user_state.save(user);
+                return;
+            }
             if (user_hero.findById(message.getFrom().getId()).isEmpty()) {
                 switch (step) {
                     case 1:
@@ -204,32 +225,40 @@ public class TelegramBot extends TelegramLongPollingBot {
                         createHero(message, (byte) 2);
 
                         break;
+
                     case 2:
                         sendMessage(message.getFrom().getId(), "Каким будет его имя?");
-                        waitForRequest = true;
-                        currentStep = 3;
+
+                        user.setWaitForRequest(true);
+                        user.setStep((byte) 3);
+                        user_state.save(user);
                         break;
                     case 3:
-                        previousUserMessage = message.getText();
                         sendMessage(message.getFrom().getId(), "Вы уверены, что его будут звать <b><i>%s</i></b>!"
-                                .formatted(previousUserMessage), new String[][] { { "Да", "Нет" } });
-                        waitForRequest = true;
-                        currentStep = 4;
+                                .formatted(message.getText()), new String[][] { { "Да", "Нет" } });
+
+                        user.setLastUserMessage(message.getText());
+                        user.setWaitForRequest(true);
+                        user.setStep((byte) 4);
+                        user_state.save(user);
                         break;
                     case 4:
-                        createHero(message, previousUserMessage);
+                        createHero(message, user.getLastUserMessage());
                         break;
                     default:
                         break;
                 }
             } else {
-                currentProcess = "";
+                user.setProcess(null);
+                user_state.save(user);
                 sendMessage(message.getFrom().getId(),
                         "У вас уже есть персонаж <b><i>%s</i></b>!"
                                 .formatted(user_hero.findById(message.getFrom().getId()).get().getHeroName()));
             }
         } else {
             sendMessage(message.getChatId(), "Используйте эту команду в личных сообщениях с ботом!");
+            user.setProcess(null);
+            user_state.save(user);
         }
     }
 
@@ -259,7 +288,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         user_hero.save(user);
         sendMessage(userId, "Персонаж <b><i>%s</i></b> создан!".formatted(name));
-        currentProcess = "";
+
+        UserState userState = user_state.findById(userId).get();
+        userState.setProcess(null);
+        userState.setStep(0);
+        user_state.save(userState);
     }
 
     private void createUser(Message message) {
@@ -402,7 +435,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         keyboardMarkup.setResizeKeyboard(true);
         keyboardMarkup.setOneTimeKeyboard(true);
         keyboardMarkup.setSelective(true);
-        sendMessage(lastMessage.getChatId(), "RPKM создан!");
         return keyboardMarkup;
     }
 
@@ -428,7 +460,12 @@ public class TelegramBot extends TelegramLongPollingBot {
         markupInline.setKeyboard(rowsInline);
         message.setReplyMarkup(markupInline);
         try {
-            lastMessageId = execute(message).getMessageId();
+            Message msg = execute(message);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+            }
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
@@ -441,8 +478,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.enableHtml(true);
 
         try {
-            lastMessage = execute(message);
-            lastMessageId = lastMessage.getMessageId();
+            Message msg = execute(message);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
@@ -453,14 +495,16 @@ public class TelegramBot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
         message.enableHtml(true);
-
-        sendMessage(chatId, "markup = " + String.valueOf(message.getReplyMarkup()));
-        ReplyKeyboardMarkup replyKeyboardMarkup = createReplyKeyboard(arrStr);
-        message.setReplyMarkup(replyKeyboardMarkup);
+        message.setReplyMarkup(createReplyKeyboard(arrStr));
 
         try {
-            lastMessage = execute(message);
-            lastMessageId = lastMessage.getMessageId();
+            Message msg = execute(message);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
@@ -469,7 +513,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void editMessage(long chatId, String newMessage) {
         EditMessageText editMessageText = new EditMessageText();
         editMessageText.setChatId(String.valueOf(chatId));
-        editMessageText.setMessageId(lastMessageId);
+        editMessageText.setMessageId(user_state.findById(chatId).get().getIdLastBotMessage());
         editMessageText.setText(newMessage);
         editMessageText.enableHtml(true);
 
@@ -488,7 +532,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         photo.setPhoto(new InputFile(imageUrlToSend));
 
         try {
-            execute(photo);
+            Message msg = execute(photo);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
@@ -520,7 +570,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         photo.setPhoto(new InputFile(imageUrlToSend));
 
         try {
-            execute(photo);
+            Message msg = execute(photo);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
@@ -562,7 +618,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(userId, "Вы еще не зарегестрированы");
         } else {
             user_table.deleteById(userId);
-            deleteHero(userId);
             sendMessage(userId, "Ваш Бог успешно удалёны!");
         }
     }
