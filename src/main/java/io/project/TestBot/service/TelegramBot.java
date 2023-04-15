@@ -71,6 +71,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/create_user", "создать пользователя"));
         listOfCommands.add(new BotCommand("/delete_hero", "удалить героя"));
         listOfCommands.add(new BotCommand("/delete_user", "удалить пользователя и героя"));
+        listOfCommands.add(new BotCommand("/get_rights", "получить права администратора"));
+        listOfCommands.add(new BotCommand("/create_task", "создать задачу"));
         listOfCommands.add(new BotCommand("/timer", "таймер на 15 секунд"));
         listOfCommands.add(new BotCommand("/cancel", "сбросить текущее состояние пользователя"));
         listOfCommands.add(new BotCommand("/help", "вывести help-сообщение"));
@@ -115,6 +117,7 @@ public class TelegramBot extends TelegramLongPollingBot {
          * }
          * }
          */
+
         UserState user = new UserState();
         if (user_state.findById(update.getMessage().getFrom().getId()).isEmpty()) {
             user.setUserId(update.getMessage().getFrom().getId());
@@ -130,7 +133,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             String messageText = update.getMessage().getText();
 
             if (user.getWaitForRequest()
-                    && (!messageText.equals("/cancel") || messageText.equals("/cancel@tstbtstst_bot"))) {
+                    && (!messageText.equals("/cancel") || !messageText.equals("/cancel@tstbtstst_bot"))) {
                 user.setWaitForRequest(false);
                 user_state.save(user);
 
@@ -139,7 +142,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         createHero(update.getMessage(), (byte) user.getStep());
                         break;
                     case "/create_task":
-                        createTask(update.getMessage(), (byte) currentStep);
+                        createTask(update.getMessage(), (byte) user.getStep());
                         break;
                     default:
                         break;
@@ -149,9 +152,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 if (messageText.equals("/cancel") || user.getProcess() == null
                         || messageText.equals("/cancel@tstbtstst_bot")) {
                     switch (messageText) {
-                        //
-                        // ТУТ БЫЛ /start, НО Я НЕ УВЕРЕН, ЧТО ОН ВООБЩЕ НУЖЕН
-                        //
                         case "/create_user", "/create_user@tstbtstst_bot":
                             createUser(update.getMessage());
                             break;
@@ -181,14 +181,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user_state.save(user);
                             break;
                         case "/help", "/help@tstbtstst_bot":
-                            sendMessage(chatId, HELP_TEXT, new String[][] { { "Новая кнопка" } });
+                            sendMessage(chatId, HELP_TEXT, new String[][] { { "/cancel" } });
                             break;
                         case "/create_task", "/create_task@tstbtstst_bot":
+                            user.setProcess("/create_task");
+                            user_state.save(user);
                             createTask(update.getMessage(), (byte) 1);
-                            currentProcess = "/create_task";
                             break;
                         case "/get_rights", "/get_rights@tstbtstst_bot":
-
                             getAdminRights(update.getMessage());
                             break;
 
@@ -346,52 +346,62 @@ public class TelegramBot extends TelegramLongPollingBot {
      * поножи}(вторая строка)и тд}
      */
     private void getAdminRights(Message message) {
-        UserSQL userSQL = new UserSQL();
+        UserSQL userSQL = user_table.findById(message.getFrom().getId()).get();
         userSQL.setIsAdmin(true);
         sendMessage(message.getChatId(), "Права получены");
         user_table.save(userSQL);
-
     }
 
     private void createTask(Message message, byte step) {
-
+        UserState user = user_state.findById(message.getFrom().getId()).get();
         if (message.getChat().isUserChat()) {
             if (!user_table.findById(message.getFrom().getId()).isEmpty()) {
-                if (!user_table.findById(message.getFrom().getId()).get().getIsAdmin() == true) {
+                if (user_table.findById(message.getFrom().getId()).get().getIsAdmin()) {
 
                     switch (step) {
                         case 1:
                             sendMessage(message.getFrom().getId(),
                                     message.getChat().getFirstName() + ", приступим к созданию задания");
-                            log.info("Start creating hero " + message.getChat().getFirstName());
+                            log.info("Start creating task " + message.getChat().getFirstName());
                             createTask(message, (byte) 2);
                             break;
                         case 2:
                             sendMessage(message.getFrom().getId(),
                                     "Введите название задания и через пробел его описание");
-                            waitForRequest = true;
-                            currentStep = 3;
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 3);
+                            user_state.save(user);
                             break;
                         case 3:
-                            previousUserMessage = message.getText();
+                            user.setLastUserMessage(message.getText());
                             sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
-                                    .formatted(previousUserMessage), new String[][] { { "Да", "Нет" } });
-                            waitForRequest = true;
-                            currentStep = 4;
+                                    .formatted(user.getLastUserMessage()), new String[][] { { "Да", "Нет" } });
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 4);
+                            user_state.save(user);
                             break;
                         case 4:
                             switch (message.getText()) {
                                 case "Да", "да":
                                     TaskSQL task = new TaskSQL();
-                                    String[] arr = previousUserMessage.split(" ");
+                                    String[] arr = user.getLastUserMessage().split(" ");
 
-                                    task.setTaskId(ThreadLocalRandom.current().nextLong(1000000, 10000000));
+                                    Long randomInt;
+                                    do {
+                                        randomInt = ThreadLocalRandom.current().nextLong(0, 10000);
+                                    } while (!task_table.findById((long) randomInt).isEmpty());
+
+                                    task.setTaskId(randomInt);
                                     task.setCreatorId(message.getFrom().getId());
                                     task.setTaskDescription(arr[0]);
-                                    task.setTaskName(arr[1]);
-                                    task.setTaskType(new String("real life task"));
-                                    sendMessage(message.getFrom().getId(), "Создание окончено!");
+                                    task.setTaskName(user.getLastUserMessage().substring(arr[0].length() + 1));
+                                    task.setTaskType("real life task");
                                     task_table.save(task);
+
+                                    user.setProcess(null);
+                                    user.setStep(0);
+                                    user_state.save(user);
+                                    sendMessage(message.getFrom().getId(), "Создание окончено!");
                                     break;
                                 case "Нет", "нет":
                                     createTask(message, (byte) 2);
@@ -399,7 +409,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                                 default:
                                     break;
                             }
-
                             break;
 
                         default:
@@ -407,15 +416,19 @@ public class TelegramBot extends TelegramLongPollingBot {
                     }
                 } else {
                     sendMessage(message.getChatId(), "Вы не администратор");
+                    user.setProcess(null);
+                    user_state.save(user);
                 }
             } else {
-                currentProcess = "";
+                user.setProcess(null);
+                user_state.save(user);
                 sendMessage(message.getFrom().getId(), "Вы не зарегестрированны");
             }
         } else {
             sendMessage(message.getChatId(), "Используйте эту команду в личных сообщениях с ботом!");
+            user.setProcess(null);
+            user_state.save(user);
         }
-
     }
 
     private ReplyKeyboardMarkup createReplyKeyboard(String[][] arrStr) {
