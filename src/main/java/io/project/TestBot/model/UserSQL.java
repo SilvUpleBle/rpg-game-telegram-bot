@@ -19,7 +19,7 @@ public class UserSQL {
 
     private String userName;
 
-    private String password;
+    private int points;
 
     public long getUserId() {
         return userId;
@@ -35,10 +35,6 @@ public class UserSQL {
 
     public void setChatId(long chatId) {
         this.chatId = chatId;
-    }
-
-    public boolean getIsAdmin() {
-        return isAdmin;
     }
 
     public void setIsAdmin(boolean isAdmin) {
@@ -69,21 +65,32 @@ public class UserSQL {
         this.userName = userName;
     }
 
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
     public String toString() {
         return "User{" +
                 " userId=" + userId +
                 ", firstName=" + firstName +
                 ", lastName=" + lastName +
                 ", userName=" + userName +
-                ", password=" + password + " " +
                 "}";
+    }
+
+    public boolean isAdmin() {
+        return isAdmin;
+    }
+
+    public int getPoints() {
+        return points;
+    }
+
+    public void setPoints(int points) {
+        this.points = points;
+    }
+
+    public void addPoints(int points) {
+        if (this.points == 0) {
+            this.points = points;
+        } else {
+            this.points += points;
+        }
     }
 }

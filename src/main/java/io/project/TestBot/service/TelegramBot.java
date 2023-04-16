@@ -17,10 +17,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.autoconfigure.metrics.MetricsProperties.Data;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
@@ -29,7 +27,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -38,11 +36,8 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import lombok.extern.slf4j.Slf4j;
@@ -72,15 +67,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/delete_hero", "удалить героя"));
         listOfCommands.add(new BotCommand("/delete_user", "удалить пользователя и героя"));
         listOfCommands.add(new BotCommand("/get_rights", "получить права администратора"));
-        listOfCommands.add(new BotCommand("/create_task", "создать задачу"));
-        listOfCommands.add(new BotCommand("/timer", "таймер на 15 секунд"));
         listOfCommands.add(new BotCommand("/cancel", "сбросить текущее состояние пользователя"));
         listOfCommands.add(new BotCommand("/help", "вывести help-сообщение"));
         try {
             execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
             execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
-            // this.execute(new SendMessage(String.valueOf(-939824682), "Я проснувся!"));
-            // this.execute(new SendMessage(String.valueOf(808370703), "Я проснувся!"));
         } catch (TelegramApiException e) {
             log.error("Error setting bot`s command list: " + e.getMessage());
         }
@@ -99,41 +90,39 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
 
-        /*
-         * if (update.hasCallbackQuery()) {
-         * 
-         * String call_data = update.getCallbackQuery().getData();
-         * long message_id = update.getCallbackQuery().getMessage().getMessageId();
-         * long chatId = update.getCallbackQuery().getMessage().getChatId();
-         * 
-         * if (call_data.equals("Yes")) {
-         * 
-         * CallbackQuery cb = new CallbackQuery();
-         * cb.setData("message");
-         * update.setCallbackQuery(cb);
-         * if (update.hasMessage() && update.getMessage().hasText()) {
-         * sendMessage(chatId, cb.getData());
-         * }
-         * }
-         * }
-         */
+        if (update.hasCallbackQuery()) {
+            log.info("callBackData = %s".formatted(update.getCallbackQuery().getData()));
+            Message newMessage = new Message();
 
-        UserState user = new UserState();
-        if (user_state.findById(update.getMessage().getFrom().getId()).isEmpty()) {
-            user.setUserId(update.getMessage().getFrom().getId());
-            user.setWaitForRequest(false);
-            user.setStep(0);
+            newMessage.setFrom(update.getCallbackQuery().getFrom());
+            newMessage.setText(update.getCallbackQuery().getData());
 
-            user_state.save(user);
-        } else {
-            user = user_state.findById(update.getMessage().getFrom().getId()).get();
+            Chat chat = new Chat();
+            chat.setType("private");
+            chat.setId(update.getCallbackQuery().getMessage().getChatId());
+            newMessage.setChat(chat);
+
+            update.setMessage(newMessage);
         }
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
+            long chatId = update.getMessage().getFrom().getId();
+            UserState user;
+
+            if (user_state.findById(update.getMessage().getFrom().getId()).isEmpty()) {
+                user = new UserState();
+                user.setUserId(update.getMessage().getFrom().getId());
+                user.setWaitForRequest(false);
+                user.setStep(0);
+
+                user_state.save(user);
+            } else {
+                user = user_state.findById(update.getMessage().getFrom().getId()).get();
+            }
 
             if (user.getWaitForRequest()
-                    && (!messageText.equals("/cancel") || !messageText.equals("/cancel@tstbtstst_bot"))) {
+                    && !(messageText.equals("/cancel") || messageText.equals("/cancel@tstbtstst_bot"))) {
                 user.setWaitForRequest(false);
                 user_state.save(user);
 
@@ -144,11 +133,18 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/create_task":
                         createTask(update.getMessage(), (byte) user.getStep());
                         break;
+                    case "/delete_user":
+                        deleteUser(update.getMessage(), (byte) user.getStep());
+                        break;
+                    case "/delete_hero":
+                        deleteHero(update.getMessage(), (byte) user.getStep());
+                        break;
                     default:
                         break;
+
                 }
+
             } else {
-                long chatId = update.getMessage().getChatId();
                 if (messageText.equals("/cancel") || user.getProcess() == null
                         || messageText.equals("/cancel@tstbtstst_bot")) {
                     switch (messageText) {
@@ -161,24 +157,24 @@ public class TelegramBot extends TelegramLongPollingBot {
                             createHero(update.getMessage(), (byte) 1);
                             break;
                         case "/delete_user", "/delete_user@tstbtstst_bot":
-                            deleteHero(update.getMessage().getFrom().getId());
-                            deleteUser(update.getMessage().getFrom().getId());
+                            user.setProcess("/delete_user");
+                            user_state.save(user);
+                            deleteUser(update.getMessage(), (byte) 1);
                             break;
                         case "/delete_hero", "/delete_hero@tstbtstst_bot":
-                            deleteHero(update.getMessage().getFrom().getId());
-                            break;
-                        case "/timer", "/timer@tstbtstst_bot":
-                            user.setProcess("/timer");
+                            user.setProcess("/delete_hero");
                             user_state.save(user);
-                            makeTimer(chatId, 15);
-                            user.setProcess(null);
-                            user_state.save(user);
+                            deleteHero(update.getMessage(), (byte) 1);
                             break;
+                        case "/timer", "/timer@tstbtstst_bot": // ПЕРЕДЕЛАТЬ
+                            user.setProcess("/timer"); // ПЕРЕДЕЛАТЬ
+                            user_state.save(user); // ПЕРЕДЕЛАТЬ
+                            makeTimer(chatId, 15); // ПЕРЕДЕЛАТЬ
+                            user.setProcess(null); // ПЕРЕДЕЛАТЬ
+                            user_state.save(user); // ПЕРЕДЕЛАТЬ
+                            break; // ПЕРЕДЕЛАТЬ
                         case "/cancel", "/cancel@tstbtstst_bot":
-                            user.setProcess(null);
-                            user.setStep((byte) 0);
-                            user.setWaitForRequest(false);
-                            user_state.save(user);
+                            cancelWithText(update.getMessage().getFrom().getId());
                             break;
                         case "/help", "/help@tstbtstst_bot":
                             sendMessage(chatId, HELP_TEXT, new String[][] { { "/cancel" } });
@@ -205,8 +201,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     //
     // НАЧАЛО БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
-    ///
-
+    //
     private void createHero(Message message, byte step) {
         UserState user = user_state.findById(message.getFrom().getId()).get();
         if (message.getChat().isUserChat()) {
@@ -234,8 +229,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                         user_state.save(user);
                         break;
                     case 3:
-                        sendMessage(message.getFrom().getId(), "Вы уверены, что его будут звать <b><i>%s</i></b>!"
-                                .formatted(message.getText()), new String[][] { { "Да", "Нет" } });
+                        sendMessageWithInlineButtons(message.getFrom().getId(),
+                                "Вы уверены, что его будут звать <b><i>%s</i></b>!"
+                                        .formatted(message.getText()),
+                                new String[][] { { "Да", "Нет" } });
 
                         user.setLastUserMessage(message.getText());
                         user.setWaitForRequest(true);
@@ -318,9 +315,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             } catch (TelegramApiException e) {
                 log.error("Error occurred: " + e.getMessage());
             }
-            if (message.getChat().isGroupChat()) {
-
-            }
             user_table.save(user);
             sendMessage(message.getChatId(),
                     "Приветствуйте нового бога в нашем мире! Имя ему <b><i>%s</i></b>".formatted(userT.getUserName()));
@@ -340,11 +334,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
     //
 
-    /*
-     * принимает массив строк где в кейборде
-     * {{инвентарь}(первая строка),{голова, торс,
-     * поножи}(вторая строка)и тд}
-     */
     private void getAdminRights(Message message) {
         UserSQL userSQL = user_table.findById(message.getFrom().getId()).get();
         userSQL.setIsAdmin(true);
@@ -356,7 +345,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         UserState user = user_state.findById(message.getFrom().getId()).get();
         if (message.getChat().isUserChat()) {
             if (!user_table.findById(message.getFrom().getId()).isEmpty()) {
-                if (user_table.findById(message.getFrom().getId()).get().getIsAdmin()) {
+                if (user_table.findById(message.getFrom().getId()).get().isAdmin()) {
 
                     switch (step) {
                         case 1:
@@ -422,7 +411,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             } else {
                 user.setProcess(null);
                 user_state.save(user);
-                sendMessage(message.getFrom().getId(), "Вы не зарегестрированны");
+                sendMessage(message.getFrom().getId(), "Вы не зарегистрированны");
             }
         } else {
             sendMessage(message.getChatId(), "Используйте эту команду в личных сообщениях с ботом!");
@@ -449,39 +438,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         keyboardMarkup.setOneTimeKeyboard(true);
         keyboardMarkup.setSelective(true);
         return keyboardMarkup;
-    }
-
-    private void sendMessageIKB_YesNo(long chatId) {// InlineKeyboard да/нет
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText("InlineKeyboard");
-        message.enableHtml(true);
-
-        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
-        List<InlineKeyboardButton> rowInline = new ArrayList<>();
-        InlineKeyboardButton ikb = new InlineKeyboardButton();
-        ikb.setText("Да");
-        ikb.setCallbackData("Yes");
-        rowInline.add(ikb);
-        ikb = new InlineKeyboardButton();
-        ikb.setText("Нет");
-        ikb.setCallbackData("No");
-        rowInline.add(ikb);
-        rowsInline.add(rowInline);
-
-        markupInline.setKeyboard(rowsInline);
-        message.setReplyMarkup(markupInline);
-        try {
-            Message msg = execute(message);
-
-            if (!user_state.findById(chatId).isEmpty()) {
-                UserState user = user_state.findById(chatId).get();
-                user.setIdLastBotMessage(msg.getMessageId());
-            }
-        } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
-        }
     }
 
     private void sendMessage(long chatId, String textToSend) {
@@ -536,6 +492,50 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occurred: " + e.getMessage());
         }
 
+    }
+
+    private void sendMessageWithInlineButtons(long chatId, String textToSend, String[][] buttons) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        message.enableHtml(true);
+        message.setReplyMarkup(createInlineKeyboard(buttons));
+
+        try {
+            Message msg = execute(message);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private InlineKeyboardMarkup createInlineKeyboard(String[][] buttons) {
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowList = new ArrayList<>();
+        List<InlineKeyboardButton> rowButtons = new ArrayList<>();
+        InlineKeyboardButton button;
+
+        for (int i = 0; i < buttons.length; i++) {
+            for (int j = 0; j < buttons[i].length; j++) {
+                button = new InlineKeyboardButton(buttons[i][j]);
+                button.setCallbackData(buttons[i][j]);
+                rowButtons.add(button);
+            }
+            rowList.add(rowButtons);
+            rowButtons = new ArrayList<>();
+        }
+        button = new InlineKeyboardButton("Отмена");
+        button.setCallbackData("/cancel");
+        rowButtons.add(button);
+        rowList.add(rowButtons);
+
+        inlineKeyboardMarkup.setKeyboard(rowList);
+        return inlineKeyboardMarkup;
     }
 
     private void sendMessageWithPicture(long chatId, String textToSend, String imageUrlToSend) {
@@ -595,6 +595,19 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void cancel(Long userId) {
+        UserState user = user_state.findById(userId).get();
+        user.setProcess(null);
+        user.setStep(0);
+        user.setWaitForRequest(false);
+        user_state.save(user);
+    }
+
+    private void cancelWithText(Long userId) {
+        cancel(userId);
+        sendMessage(userId, "Выполнение действия прекращено!");
+    }
+
     //
     // ТАЙМЕР
     //
@@ -617,21 +630,77 @@ public class TelegramBot extends TelegramLongPollingBot {
         sendMessage(chatId, "Время вышло!");
     }
 
-    private void deleteHero(long userId) {
-        if (user_hero.findById(userId).isEmpty()) {
-            sendMessage(userId, "У вас нет созданного героя! Чтобы создать героя, используйте /create_hero");
-        } else {
-            user_hero.deleteById(userId);
-            sendMessage(userId, "Ваш персонаж успешно удалён!");
+    private void deleteHero(Message message, byte step) {
+        switch (step) {
+            case 1:
+                if (user_hero.findById(message.getFrom().getId()).isEmpty()) {
+                    sendMessage(message.getFrom().getId(),
+                            "У вас нет созданного героя! Чтобы создать героя, используйте /create_hero");
+                    cancel(message.getFrom().getId());
+                } else {
+                    sendMessageWithInlineButtons(message.getFrom().getId(),
+                            "Вы уверены, что хотите удалить своего героя?", new String[][] { { "Да", "Нет" } });
+
+                    UserState user = user_state.findById(message.getFrom().getId()).get();
+                    user.setWaitForRequest(true);
+                    user.setStep(2);
+                    user_state.save(user);
+                }
+                break;
+            case 2:
+                switch (message.getText()) {
+                    case "Да", "да":
+                        user_hero.deleteById(message.getFrom().getId());
+                        sendMessage(message.getFrom().getId(), "Ваш герой успешно удалён!");
+                        cancel(message.getFrom().getId());
+                        break;
+                    case "Нет", "нет":
+                        cancel(message.getFrom().getId());
+                        break;
+                    default:
+                        sendMessage(message.getFrom().getId(), "Не понимаю команду!");
+                        cancel(message.getFrom().getId());
+                        break;
+                }
+                break;
         }
     }
 
-    private void deleteUser(long userId) {
-        if (user_table.findById(userId).isEmpty()) {
-            sendMessage(userId, "Вы еще не зарегестрированы");
-        } else {
-            user_table.deleteById(userId);
-            sendMessage(userId, "Ваш Бог успешно удалёны!");
+    private void deleteUser(Message message, byte step) {
+        switch (step) {
+            case 1:
+                if (user_table.findById(message.getFrom().getId()).isEmpty()) {
+                    sendMessage(message.getFrom().getId(),
+                            "У вас нет созданного Бога! Чтобы создать Бога, используйте /create_user");
+                    cancelWithText(message.getFrom().getId());
+                } else {
+                    sendMessageWithInlineButtons(message.getFrom().getId(),
+                            "Вы уверены, что хотите удалить своего Бога и его героя?",
+                            new String[][] { { "Да", "Нет" } });
+
+                    UserState user = user_state.findById(message.getFrom().getId()).get();
+                    user.setWaitForRequest(true);
+                    user.setStep(2);
+                    user_state.save(user);
+                }
+                break;
+            case 2:
+                switch (message.getText()) {
+                    case "Да", "да":
+                        user_hero.deleteById(message.getFrom().getId());
+                        user_table.deleteById(message.getFrom().getId());
+                        sendMessage(message.getFrom().getId(), "Ваш Бог и его герой успешно удалёны!");
+                        cancel(message.getFrom().getId());
+                        break;
+                    case "Нет", "нет":
+                        cancelWithText(message.getFrom().getId());
+                        break;
+                    default:
+                        sendMessage(message.getFrom().getId(), "Не понимаю команду!");
+                        cancelWithText(message.getFrom().getId());
+                        break;
+                }
+                break;
         }
     }
 
