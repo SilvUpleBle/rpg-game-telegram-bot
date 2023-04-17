@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
+import org.glassfish.grizzly.utils.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -187,6 +188,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/get_rights", "/get_rights@tstbtstst_bot":
                             getAdminRights(update.getMessage());
                             break;
+                        case "/menu", "/menu@tstbtstst_bot":
+                            showMenu(update.getMessage().getFrom().getId());
+                            break;
 
                         default:
                             sendMessage(chatId, "Не понимаю команду!");
@@ -265,6 +269,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 registerHero(message.getFrom().getId(), heroName);
                 break;
             case "Нет", "нет":
+                sendMessage(message.getFrom().getId(), "Хорошо, попробуй снова!\nЕсли хочешь выйти, то напиши /cancel");
                 createHero(message, (byte) 2);
                 break;
             default:
@@ -329,6 +334,19 @@ public class TelegramBot extends TelegramLongPollingBot {
     //
     // КОНЕЦ БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
     //
+
+    private void showMenu(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Профиль", "/profile"));
+        list.get(0).add(new Pair<String, String>("Герой", "/hero"));
+        list.get(1).add(new Pair<String, String>("Задачи", "/tasks"));
+        if (user_table.findById(userId).get().isAdmin()) {
+            list.get(1).add(new Pair<String, String>("Администрирование", "/administration"));
+        }
+        sendMessageWithInlineButtons(userId, "Меню:", list);
+    }
 
     //
     // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
@@ -514,6 +532,27 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void sendMessageWithInlineButtons(long chatId, String textToSend,
+            List<List<Pair<String, String>>> buttons) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        message.enableHtml(true);
+        message.setReplyMarkup(createInlineKeyboard(buttons));
+
+        try {
+            Message msg = execute(message);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
     private InlineKeyboardMarkup createInlineKeyboard(String[][] buttons) {
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowList = new ArrayList<>();
@@ -529,10 +568,26 @@ public class TelegramBot extends TelegramLongPollingBot {
             rowList.add(rowButtons);
             rowButtons = new ArrayList<>();
         }
-        button = new InlineKeyboardButton("Отмена");
-        button.setCallbackData("/cancel");
-        rowButtons.add(button);
-        rowList.add(rowButtons);
+
+        inlineKeyboardMarkup.setKeyboard(rowList);
+        return inlineKeyboardMarkup;
+    }
+
+    private InlineKeyboardMarkup createInlineKeyboard(List<List<Pair<String, String>>> buttons) {
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowList = new ArrayList<>();
+        List<InlineKeyboardButton> rowButtons = new ArrayList<>();
+        InlineKeyboardButton button;
+
+        for (int i = 0; i < buttons.size(); i++) {
+            for (int j = 0; j < buttons.get(i).size(); j++) {
+                button = new InlineKeyboardButton(buttons.get(i).get(j).getFirst());
+                button.setCallbackData(buttons.get(i).get(j).getSecond());
+                rowButtons.add(button);
+            }
+            rowList.add(rowButtons);
+            rowButtons = new ArrayList<>();
+        }
 
         inlineKeyboardMarkup.setKeyboard(rowList);
         return inlineKeyboardMarkup;
