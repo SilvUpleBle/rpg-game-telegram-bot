@@ -25,6 +25,7 @@ import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMem
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
@@ -41,6 +42,9 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import com.vdurmont.emoji.EmojiParser;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -191,13 +195,29 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/menu", "/menu@tstbtstst_bot":
                             showMenu(update.getMessage().getFrom().getId());
                             break;
+                        case "/profile", "/profile@tstbtstst_bot":
+                            showProfile(update.getMessage().getFrom().getId());
+                            break;
+                        case "/hero", "/hero@tstbtstst_bot":
+                            showHero(update.getMessage().getFrom().getId());
+                            break;
+                        case "/tasks", "/tasks@tstbtstst_bot":
+                            showTasksList(update.getMessage().getFrom().getId());
+                            break;
+                        case "/administration", "/administration@tstbtstst_bot":
+                            showAdministration(update.getMessage().getFrom().getId());
+                            break;
 
                         default:
                             sendMessage(chatId, "Не понимаю команду!");
+                            user.setLastUserMessage(null);
+                            user_state.save(user);
                             break;
                     }
                 } else {
-                    sendMessage(chatId, "Ещё не закончено выполнение предыдущей функции!");
+                    sendMessage(chatId,
+                            "Выполнение предыдущей функции ещё не завершено!\nЕсли возникла ошибка, используйте /cancel!");
+                    cancel(update.getMessage().getFrom().getId());
                 }
             }
         }
@@ -342,15 +362,149 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.get(0).add(new Pair<String, String>("Профиль", "/profile"));
         list.get(0).add(new Pair<String, String>("Герой", "/hero"));
         list.get(1).add(new Pair<String, String>("Задачи", "/tasks"));
+        list.get(1).add(new Pair<String, String>("Рейтинг", "/rating"));
         if (user_table.findById(userId).get().isAdmin()) {
-            list.get(1).add(new Pair<String, String>("Администрирование", "/administration"));
+            list.add(new ArrayList<>());
+            list.get(2)
+                    .add(new Pair<String, String>(
+                            EmojiParser.parseToUnicode(":hammer:") + "Администрирование"
+                                    + EmojiParser.parseToUnicode(":hammer:"),
+                            "/administration"));
         }
-        sendMessageWithInlineButtons(userId, "Меню:", list);
+
+        if (user_state.findById(userId).get().getLastUserMessage() != null
+                && (user_state.findById(userId).get().getLastUserMessage().equals("/profile")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/hero")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/tasks")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/administration"))) {
+            editMessage(userId, "Меню:", list);
+        } else {
+            sendMessageWithInlineButtons(userId, "Меню:", list);
+        }
+
+        UserState user = user_state.findById(userId).get();
+        user.setLastUserMessage("/menu");
+        user_state.save(user);
+    }
+
+    private void showProfile(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Назад", "/menu"));
+
+        UserSQL user = user_table.findById(userId).get();
+
+        editMessage(userId, "Ваш профиль:" +
+                "\n\n<b>Ваше имя:</b> \t" + user.getFirstName() +
+                "\n<b>Права администратора:</b> \t" + user.isAdmin() +
+                "\n<b>Количество Ваших очков:</b> \t" + user.getPoints() +
+                "\n<b>Количество активных задач:</b> \t"
+                + getIdsFromString(user.getActiveTasks(), ";").size(), list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/profile");
+        user_state.save(userS);
+    }
+
+    private void showHero(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        String textToSend;
+        if (user_hero.findById(userId).isEmpty()) {
+            textToSend = "У Вас нет героя!\nИспользуйте /create_hero, чтобы создать его!";
+
+        } else {
+            textToSend = "Меню герой:";
+            list.add(new ArrayList<>());
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Информация", "/heroInfo"));
+            list.get(0).add(new Pair<String, String>("Экипировка", "/heroEquipment"));
+            list.get(1).add(new Pair<String, String>("Инвентарь", "/heroInventory"));
+            list.get(1).add(new Pair<String, String>("Питомец" + EmojiParser.parseToUnicode(":hammer:"), "/heroPet"));
+        }
+
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
+        editMessage(userId, textToSend, list);
+
+        UserState user = user_state.findById(userId).get();
+        user.setLastUserMessage("/hero");
+        user_state.save(user);
+    }
+
+    private void showTasksList(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        UserSQL user = user_table.findById(userId).get();
+        List<Long> tasksId = getIdsFromString(user.getActiveTasks(), ";");
+        String textToSend = "Ваши задачи:";
+        if (tasksId.isEmpty()) {
+            textToSend += "\n\nУ Вас нет активных задач!";
+        } else {
+            for (int i = 0; i < tasksId.size(); i++) {
+                list.add(new ArrayList<>());
+                list.get(i).add(new Pair<String, String>(task_table.findById(tasksId.get(i)).get().getTaskName(),
+                        "/getTask " + tasksId.get(i)));
+            }
+        }
+
+        list.add(new ArrayList<>());
+        list.get(tasksId.size()).add(new Pair<String, String>("Назад", "/menu"));
+
+        editMessage(userId, textToSend, list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/tasks");
+        user_state.save(userS);
+    }
+
+    private void showAdministration(long userId) {
+        if (!user_table.findById(userId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Пользователи", "/showUsers"));
+        list.get(1).add(new Pair<String, String>("Сбросить очки", "/dropAllPoints"));
+        list.get(1).add(new Pair<String, String>("Задачи", "/adminTasks"));
+        list.get(2).add(new Pair<String, String>("Назад", "/menu"));
+        editMessage(userId, "Меню администратора:", list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/administration");
+        user_state.save(userS);
+    }
+
+    private void showUsers(long userId) {
+        if (!user_table.findById(userId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+
+        long chatId = user_table.findById(userId).get().getChatId();
+        // Query query = session.createQuery("FROM user_table WHERE chat_id = :chatId");
+        // Query query = org.hibernate.Session.createQuery("FROM user_table WHERE
+        // chat_id = :chatId");
+        // query.setParameter();
     }
 
     //
     // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
     //
+
+    private List<Long> getIdsFromString(String text, String separator) {
+        List<Long> list = new ArrayList<>();
+        if (text == null) {
+            return list;
+        }
+
+        String[] strList = text.split(separator);
+        for (String element : strList) {
+            list.add(Long.valueOf(element));
+        }
+        return list;
+    }
 
     private void getAdminRights(Message message) {
         UserSQL userSQL = user_table.findById(message.getFrom().getId()).get();
@@ -400,8 +554,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                                     task.setTaskId(randomInt);
                                     task.setCreatorId(message.getFrom().getId());
-                                    task.setTaskDescription(arr[0]);
-                                    task.setTaskName(user.getLastUserMessage().substring(arr[0].length() + 1));
+                                    task.setTaskDescription(user.getLastUserMessage().substring(arr[0].length() + 1));
+                                    task.setTaskName(arr[0]);
                                     task.setTaskType("real life task");
                                     task_table.save(task);
 
@@ -509,7 +663,32 @@ public class TelegramBot extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
+    }
 
+    private void editMessage(long chatId, String newMessage, List<List<Pair<String, String>>> buttons) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(user_state.findById(chatId).get().getIdLastBotMessage());
+        editMessageText.setText(newMessage);
+        editMessageText.setReplyMarkup(createInlineKeyboard(buttons));
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void deleteLastMessage(long chatId) {
+        DeleteMessage deleteMessage = new DeleteMessage(String.valueOf(chatId),
+                user_state.findById(chatId).get().getIdLastBotMessage());
+
+        try {
+            execute(deleteMessage);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
     }
 
     private void sendMessageWithInlineButtons(long chatId, String textToSend, String[][] buttons) {
@@ -544,6 +723,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             Message msg = execute(message);
 
             if (!user_state.findById(chatId).isEmpty()) {
+                log.info("Сохранил id сообщения: " + msg.getMessageId());
                 UserState user = user_state.findById(chatId).get();
                 user.setIdLastBotMessage(msg.getMessageId());
                 user_state.save(user);
@@ -710,7 +890,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         cancel(message.getFrom().getId());
                         break;
                     case "Нет", "нет":
-                        cancel(message.getFrom().getId());
+                        cancelWithText(message.getFrom().getId());
                         break;
                     default:
                         sendMessage(message.getFrom().getId(), "Не понимаю команду!");

@@ -21,6 +21,8 @@ public class UserSQL {
 
     private int points;
 
+    private String activeTasks;
+
     public long getUserId() {
         return userId;
     }
@@ -93,4 +95,13 @@ public class UserSQL {
             this.points += points;
         }
     }
+
+    public String getActiveTasks() {
+        return activeTasks;
+    }
+
+    public void setActiveTasks(String activeTasks) {
+        this.activeTasks = activeTasks;
+    }
+
 }
