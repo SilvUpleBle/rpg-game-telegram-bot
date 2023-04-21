@@ -122,7 +122,12 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
 
         if (update.hasMessage() && update.getMessage().hasText()) {
-            String messageText = update.getMessage().getText();
+            String messageText;
+            if (update.getMessage().getText().split(" ").length > 1) {
+                messageText = update.getMessage().getText().split(" ")[0];
+            } else {
+                messageText = update.getMessage().getText();
+            }
             long chatId = update.getMessage().getFrom().getId();
             UserState user;
 
