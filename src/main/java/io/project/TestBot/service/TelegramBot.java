@@ -15,12 +15,9 @@ import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
 
 import org.glassfish.grizzly.utils.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +29,8 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCaption;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageMedia;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
@@ -69,6 +68,12 @@ public class TelegramBot extends TelegramLongPollingBot {
     private Task_table task_table;
 
     final BotConfig config;
+
+    String[] cats = {
+            "https://sun9-52.userapi.com/impg/iqGx6lG3CMWR8NkDvQYu6JD3emOP0a35ror-lw/MWX-MqXDMVs.jpg?size=1280x1242&quality=96&sign=fe2dba65bfe35a69ca1185e3201d55d9&type=album",
+            "https://sun9-6.userapi.com/impg/Xn57Tfyamtbfn_17JsUeQhwhvcfXcqLtm21_bA/RSycQewibHk.jpg?size=1280x1234&quality=96&sign=903fe79684c0ab209f25486e63f4ecb9&type=album",
+            "https://sun9-54.userapi.com/impg/tStT-_0vwHNuzCVXku0Z-hvzH3AvN4YSXDfV7w/YwKG7pX13m8.jpg?size=1280x1224&quality=96&sign=728751d38fac0c97a0e504b28a9b16d6&type=album",
+            "https://sun9-62.userapi.com/impg/VE9gMyTK8T9I3MMPlXr-5czLv4Oxwhh3ky-k_g/K-NrldqmyA0.jpg?size=1280x1225&quality=96&sign=0ddb8766cbd12ac72a75a3cccb4d5252&type=album" };
 
     static final String HELP_TEXT = "help text";
 
@@ -252,6 +257,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/heroInventory", "/heroInventory@tstbtstst_bot":
                             showHeroInventory(update.getMessage().getFrom().getId());
                             break;
+                        case "/heroPet", "/heroPet@tstbtstst_bot":
+                            showUnderConstruct(update.getMessage().getFrom().getId(),
+                                    new Pair<String, String>("Назад", "/hero"));
+                            break;
+
                         case "/createItems":
                             List<ItemSQL> list = new ArrayList<>();
                             list.add(new ItemSQL((long) 1, "яблоко", "heal", 1));
@@ -567,20 +577,31 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         Collections.sort(userFromCurrentChat);
         String textToSend = "Рейтинг пользователей:\n\n";
+        int pos = 1;
         for (UserSQL userSQL : userFromCurrentChat) {
             if (user.getUserId() == userSQL.getUserId()) {
-                textToSend += "<b>@%s (%s %s) - %d</b>\n".formatted(userSQL.getUserName(), userSQL.getFirstName(),
+                textToSend += "<b>%d. @%s (%s %s) - %d</b>\n".formatted(pos, userSQL.getUserName(),
+                        userSQL.getFirstName(),
                         userSQL.getLastName(), userSQL.getPoints());
             } else {
-                textToSend += "@%s (%s %s) - %d\n".formatted(userSQL.getUserName(), userSQL.getFirstName(),
+                textToSend += "%d. @%s (%s %s) - %d\n".formatted(pos, userSQL.getUserName(), userSQL.getFirstName(),
                         userSQL.getLastName(), userSQL.getPoints());
             }
+            pos++;
         }
 
         editMessage(userId, textToSend, list);
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/rating");
         user_state.save(userS);
+    }
+
+    private void showUnderConstruct(Long userId, Pair<String, String> pair) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(pair);
+        sendMessageWithPicture(userId, "Этот раздел пока ещё в разработке!",
+                cats[ThreadLocalRandom.current().nextInt(0, 3)], list);
     }
 
     // ИЗУЧИТЬ ТЕМУ С ЗАПРОСАМИ ЧЕРЕЗ HIBERNATE (ПОТОМУ ЧТО chat_id не является @Id)
@@ -975,6 +996,27 @@ public class TelegramBot extends TelegramLongPollingBot {
         photo.setChatId(String.valueOf(chatId));
         photo.setCaption(textToSend);
         photo.setPhoto(new InputFile(imageUrlToSend));
+
+        try {
+            Message msg = execute(photo);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void sendMessageWithPicture(long chatId, String textToSend, String imageUrlToSend,
+            List<List<Pair<String, String>>> buttons) {
+        SendPhoto photo = new SendPhoto();
+        photo.setChatId(String.valueOf(chatId));
+        photo.setCaption(textToSend);
+        photo.setPhoto(new InputFile(imageUrlToSend));
+        photo.setReplyMarkup(createInlineKeyboard(buttons));
 
         try {
             Message msg = execute(photo);
