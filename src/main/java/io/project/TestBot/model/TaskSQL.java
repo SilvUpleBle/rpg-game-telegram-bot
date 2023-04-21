@@ -6,84 +6,102 @@ import jakarta.persistence.Id;
 @Entity(name = "task_table")
 public class TaskSQL {
     @Id
-    private Long TaskId;
+    private Long taskId;
 
-    private Long AcceptorId;
+    private Long creatorId;
 
-    private Long CreatorId;
+    private String recipientId;
 
-    private String TaskName;
+    private String taskName;
 
-    private String TaskDescription;
+    private String taskDescription;
 
-    private String DateStart;
+    private int points;
 
-    private String DateEnd;
+    private String dateStart;
 
-    private String TaskType;
+    private String dateEnd;
+
+    private String taskType;
 
     public Long getTaskId() {
-        return TaskId;
+        return taskId;
     }
 
     public void setTaskId(Long taskId) {
-        TaskId = taskId;
+        this.taskId = taskId;
     }
 
-    public Long getAcceptorId() {
-        return AcceptorId;
+    public String getRecipientId() {
+        return recipientId;
     }
 
-    public void setAcceptorId(Long acceptorId) {
-        AcceptorId = acceptorId;
+    public void setRecipientId(String recipientId) {
+        this.recipientId = recipientId;
+    }
+
+    public void addRecipientId(String recipientId) {
+        if (this.recipientId.isEmpty()) {
+            this.recipientId = recipientId;
+        } else {
+            this.recipientId += ", %s".formatted(recipientId);
+        }
     }
 
     public Long getCreatorId() {
-        return CreatorId;
+        return creatorId;
     }
 
     public void setCreatorId(Long creatorId) {
-        CreatorId = creatorId;
+        this.creatorId = creatorId;
     }
 
     public String getTaskName() {
-        return TaskName;
+        return taskName;
     }
 
     public void setTaskName(String taskName) {
-        TaskName = taskName;
+        this.taskName = taskName;
     }
 
     public String getTaskDescription() {
-        return TaskDescription;
+        return taskDescription;
     }
 
     public void setTaskDescription(String taskDescription) {
-        TaskDescription = taskDescription;
+        this.taskDescription = taskDescription;
     }
 
     public String getDateStart() {
-        return DateStart;
+        return dateStart;
     }
 
     public void setDateStart(String dateStart) {
-        DateStart = dateStart;
+        this.dateStart = dateStart;
     }
 
     public String getDateEnd() {
-        return DateEnd;
+        return dateEnd;
     }
 
     public void setDateEnd(String dateEnd) {
-        DateEnd = dateEnd;
+        this.dateEnd = dateEnd;
     }
 
     public String getTaskType() {
-        return TaskType;
+        return taskType;
     }
 
     public void setTaskType(String taskType) {
-        TaskType = taskType;
+        this.taskType = taskType;
+    }
+
+    public int getPoints() {
+        return points;
+    }
+
+    public void setPoints(int points) {
+        this.points = points;
     }
 
 }

@@ -1,24 +1,15 @@
 package io.project.TestBot.model;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 
 @Entity(name = "user_hero")
 public class UserHero {
 
-    /*
-     * 1 id
-     * 2 name
-     * 4 game role ? demiurg or adventurer
-     * 6 fp
-     * 7 head
-     * 8 body
-     * 9 arms
-     * 10 legs
-     * 11 left hand
-     * 12 right hand
-     * 13 inventory(string of items i
-     */
     @Id
     private Long userId;
 
@@ -28,19 +19,15 @@ public class UserHero {
 
     private int forcePower;
 
-    // private String head;
+    private int currentHealth;
 
-    // private String body;
+    private int maxHealth;
 
-    // private String arms;
+    private int money;
 
-    // private String legs;
+    private String inventory = "";
 
-    // private String rightHand;
-
-    // private String leftHand;
-
-    // private String inventory;
+    private String equipment = ";;;;;";
 
     public long getUserId() {
         return userId;
@@ -74,61 +61,70 @@ public class UserHero {
         this.forcePower = forcePower;
     }
 
-    /*
-     * public String getHead() {
-     * return head;
-     * }
-     * 
-     * public void setHead(String head) {
-     * this.head = head;
-     * }
-     * 
-     * public String getBody() {
-     * return body;
-     * }
-     * 
-     * public void setBody(String body) {
-     * this.body = body;
-     * }
-     * 
-     * public String getArms() {
-     * return arms;
-     * }
-     * 
-     * public void setArms(String arms) {
-     * this.arms = arms;
-     * }
-     * 
-     * public String getLegs() {
-     * return legs;
-     * }
-     * 
-     * public void setLegs(String legs) {
-     * this.legs = legs;
-     * }
-     * 
-     * public String getRightHand() {
-     * return rightHand;
-     * }
-     * 
-     * public void setRightHand(String rightHand) {
-     * this.rightHand = rightHand;
-     * }
-     * 
-     * public String getLeftHand() {
-     * return leftHand;
-     * }
-     * 
-     * public void setLeftHand(String leftHand) {
-     * this.leftHand = leftHand;
-     * }
-     * 
-     * public String getInventory() {
-     * return inventory;
-     * }
-     * 
-     * public void setInventory(String inventory) {
-     * this.inventory = inventory;
-     * }
-     */
+    public String getInventory() {
+        return inventory;
+    }
+
+    public void setInventory(String inventory) {
+        this.inventory = inventory;
+    }
+
+    public void addToInventory(Long itemId) {
+        if (inventory.equals("")) {
+            inventory = String.valueOf(itemId);
+        } else {
+            inventory += ";" + itemId;
+        }
+    }
+
+    public void takeFromInventory(Long itemId) {
+        List<String> list = new ArrayList<>(Arrays.asList(inventory.split(";")));
+        inventory = "";
+        if (list.size() > 1) {
+            for (int i = 0; i < list.size(); i++) {
+                if (list.get(i).equals(String.valueOf(itemId))) {
+                    list.remove(i);
+                    break;
+                }
+            }
+
+            inventory += list.get(0);
+            for (int i = 1; i < list.size(); i++) {
+                inventory += ";" + list.get(i);
+            }
+        }
+    }
+
+    public String getEquipment() {
+        return equipment;
+    }
+
+    public void setEquipment(String equipment) {
+        this.equipment = equipment;
+    }
+
+    public int getCurrentHealth() {
+        return currentHealth;
+    }
+
+    public void setCurrentHealth(int currentHealth) {
+        this.currentHealth = currentHealth;
+    }
+
+    public int getMaxHealth() {
+        return maxHealth;
+    }
+
+    public void setMaxHealth(int maxHealth) {
+        this.maxHealth = maxHealth;
+    }
+
+    public int getMoney() {
+        return money;
+    }
+
+    public void setMoney(int money) {
+        this.money = money;
+    }
+
 }
