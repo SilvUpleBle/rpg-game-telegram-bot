@@ -4,7 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 
 @Entity(name = "user_table")
-public class UserSQL {
+public class UserSQL implements Comparable<UserSQL> {
 
     @Id
     private Long userId;
@@ -20,6 +20,8 @@ public class UserSQL {
     private String userName;
 
     private int points;
+
+    private String activeTasks;
 
     public long getUserId() {
         return userId;
@@ -93,4 +95,26 @@ public class UserSQL {
             this.points += points;
         }
     }
+
+    public String getActiveTasks() {
+        return activeTasks;
+    }
+
+    public void setActiveTasks(String activeTasks) {
+        this.activeTasks = activeTasks;
+    }
+
+    @Override
+    public int compareTo(UserSQL user) {
+        if (this.points == user.getPoints()) {
+            return 0;
+        }
+
+        if (this.points > user.getPoints()) {
+            return -1;
+        }
+
+        return 1;
+    }
+
 }

@@ -6,12 +6,15 @@ import io.project.TestBot.model.UserSQL;
 import io.project.TestBot.model.UserState;
 import io.project.TestBot.model.User_hero;
 import io.project.TestBot.model.User_state;
+import io.project.TestBot.model.ItemSQL;
+import io.project.TestBot.model.Item_table;
 import io.project.TestBot.model.TaskSQL;
 import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +28,7 @@ import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMem
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
@@ -41,12 +45,17 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import com.vdurmont.emoji.EmojiParser;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
 
+    @Autowired
+    private Item_table item_table;
     @Autowired
     private User_state user_state;
     @Autowired
@@ -57,6 +66,12 @@ public class TelegramBot extends TelegramLongPollingBot {
     private Task_table task_table;
 
     final BotConfig config;
+
+    String[] cats = {
+            "https://sun9-52.userapi.com/impg/iqGx6lG3CMWR8NkDvQYu6JD3emOP0a35ror-lw/MWX-MqXDMVs.jpg?size=1280x1242&quality=96&sign=fe2dba65bfe35a69ca1185e3201d55d9&type=album",
+            "https://sun9-6.userapi.com/impg/Xn57Tfyamtbfn_17JsUeQhwhvcfXcqLtm21_bA/RSycQewibHk.jpg?size=1280x1234&quality=96&sign=903fe79684c0ab209f25486e63f4ecb9&type=album",
+            "https://sun9-54.userapi.com/impg/tStT-_0vwHNuzCVXku0Z-hvzH3AvN4YSXDfV7w/YwKG7pX13m8.jpg?size=1280x1224&quality=96&sign=728751d38fac0c97a0e504b28a9b16d6&type=album",
+            "https://sun9-62.userapi.com/impg/VE9gMyTK8T9I3MMPlXr-5czLv4Oxwhh3ky-k_g/K-NrldqmyA0.jpg?size=1280x1225&quality=96&sign=0ddb8766cbd12ac72a75a3cccb4d5252&type=album" };
 
     static final String HELP_TEXT = "help text";
 
@@ -213,13 +228,71 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/menu", "/menu@tstbtstst_bot":
                             showMenu(update.getMessage().getFrom().getId());
                             break;
+                        case "/profile", "/profile@tstbtstst_bot":
+                            showProfile(update.getMessage().getFrom().getId());
+                            break;
+                        case "/hero", "/hero@tstbtstst_bot":
+                            showHero(update.getMessage().getFrom().getId());
+                            break;
+                        case "/tasks", "/tasks@tstbtstst_bot":
+                            showTasksList(update.getMessage().getFrom().getId());
+                            break;
+                        case "/administration", "/administration@tstbtstst_bot":
+                            showAdministration(update.getMessage().getFrom().getId());
+                            break;
+                        case "/rating", "/rating@tstbtstst_bot":
+                            showRating(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showUsers", "/showUsers@tstbtstst_bot":
+                            showUsers(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showUserInfo", "/showUserInfo@tstbtstst_bot":
+                            showUserInfo(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/takeAdministrationRights", "/takeAdministrationRights@tstbtstst_bot":
+                            takeAdministrationRights(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/giveAdministrationRights", "/giveAdministrationRights@tstbtstst_bot":
+                            giveAdministrationRights(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/giveItem", "/giveItem@tstbtstst_bot":
+                            giveItem(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/heroInventory", "/heroInventory@tstbtstst_bot":
+                            showHeroInventory(update.getMessage().getFrom().getId());
+                            break;
+                        case "/heroPet", "/heroPet@tstbtstst_bot":
+                            showUnderConstruct(update.getMessage().getFrom().getId(),
+                                    new Pair<String, String>("Назад", "/hero"));
+                            break;
+
+                        case "/createItems":
+                            List<ItemSQL> list = new ArrayList<>();
+                            list.add(new ItemSQL((long) 1, "яблоко", "heal", 1));
+                            list.add(new ItemSQL((long) 2, "палка-убивалка", "weapon", 1));
+                            list.add(new ItemSQL((long) 3, "клоунский колпак", "head", 1));
+                            list.add(new ItemSQL((long) 4, "алмазный нагрудник", "chest", 1));
+                            list.add(new ItemSQL((long) 5, "штаны из берёзовый коры", "legs", 1));
+                            list.add(new ItemSQL((long) 6, "сапоги-скороходы", "foots", 1));
+                            list.add(new ItemSQL((long) 7, "кольцо всевластия", "talisman", 1));
+                            list.add(new ItemSQL((long) 8, "тетрадь в горошек", "loot", 1));
+                            createItems(list);
+                            break;
 
                         default:
                             sendMessage(chatId, "Не понимаю команду!");
+                            user.setLastUserMessage(null);
+                            user_state.save(user);
                             break;
                     }
                 } else {
-                    sendMessage(chatId, "Ещё не закончено выполнение предыдущей функции!");
+                    sendMessage(chatId,
+                            "Выполнение предыдущей функции ещё не завершено!\nЕсли возникла ошибка, используйте /cancel!");
+                    // cancel(update.getMessage().getFrom().getId());
                 }
             }
         }
@@ -364,10 +437,300 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.get(0).add(new Pair<String, String>("Профиль", "/profile"));
         list.get(0).add(new Pair<String, String>("Герой", "/hero"));
         list.get(1).add(new Pair<String, String>("Задачи", "/tasks"));
+        list.get(1).add(new Pair<String, String>("Рейтинг", "/rating"));
         if (user_table.findById(userId).get().isAdmin()) {
-            list.get(1).add(new Pair<String, String>("Администрирование", "/administration"));
+            list.add(new ArrayList<>());
+            list.get(2)
+                    .add(new Pair<String, String>(
+                            EmojiParser.parseToUnicode(":hammer:") + "Администрирование"
+                                    + EmojiParser.parseToUnicode(":hammer:"),
+                            "/administration"));
         }
-        sendMessageWithInlineButtons(userId, "Меню:", list);
+
+        if (user_state.findById(userId).get().getLastUserMessage() != null
+                && (user_state.findById(userId).get().getLastUserMessage().equals("/profile")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/hero")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/tasks")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/administration")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/rating"))) {
+            editMessage(userId, "Меню:", list);
+        } else {
+            sendMessageWithInlineButtons(userId, "Меню:", list);
+        }
+
+        UserState user = user_state.findById(userId).get();
+        user.setLastUserMessage("/menu");
+        user_state.save(user);
+    }
+
+    private void showProfile(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Назад", "/menu"));
+
+        UserSQL user = user_table.findById(userId).get();
+
+        editMessage(userId, "Ваш профиль:" +
+                "\n\n<b>Ваше имя:</b> \t" + user.getFirstName() +
+                "\n<b>Права администратора:</b> \t" + user.isAdmin() +
+                "\n<b>Количество Ваших очков:</b> \t" + user.getPoints() +
+                "\n<b>Количество активных задач:</b> \t"
+                + getIdsFromString(user.getActiveTasks(), ";").size(), list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/profile");
+        user_state.save(userS);
+    }
+
+    private void showHero(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        String textToSend;
+        if (user_hero.findById(userId).isEmpty()) {
+            textToSend = "У Вас нет героя!\nИспользуйте /create_hero, чтобы создать его!";
+
+        } else {
+            textToSend = "Меню героя:";
+            list.add(new ArrayList<>());
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Информация", "/heroInfo"));
+            list.get(0).add(new Pair<String, String>("Экипировка", "/heroEquipment"));
+            list.get(1).add(new Pair<String, String>("Инвентарь", "/heroInventory"));
+            list.get(1).add(new Pair<String, String>("Питомец" + EmojiParser.parseToUnicode(":hammer:"), "/heroPet"));
+        }
+
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
+        editMessage(userId, textToSend, list);
+
+        UserState user = user_state.findById(userId).get();
+        user.setLastUserMessage("/hero");
+        user_state.save(user);
+    }
+
+    private void showHeroInventory(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Назад", "/hero"));
+
+        String textToSend = "Инвентарь:\n\n";
+        UserHero hero = user_hero.findById(userId).get();
+        List<Long> items = getIdsFromString(hero.getInventory(), ";");
+        if (items.isEmpty()) {
+            textToSend += "Ваш инвентарь пуст!";
+        } else {
+            for (Long itemId : items) {
+                textToSend += item_table.findById(itemId).get().toString() + "\n";
+            }
+        }
+        editMessage(userId, textToSend, list);
+    }
+
+    private void showTasksList(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        UserSQL user = user_table.findById(userId).get();
+        List<Long> tasksId = getIdsFromString(user.getActiveTasks(), ";");
+        String textToSend = "Ваши задачи:";
+        if (tasksId.isEmpty()) {
+            textToSend += "\n\nУ Вас нет активных задач!";
+        } else {
+            for (int i = 0; i < tasksId.size(); i++) {
+                list.add(new ArrayList<>());
+                list.get(i).add(new Pair<String, String>(task_table.findById(tasksId.get(i)).get().getTaskName(),
+                        "/getTask " + tasksId.get(i)));
+            }
+        }
+
+        list.add(new ArrayList<>());
+        list.get(tasksId.size()).add(new Pair<String, String>("Назад", "/menu"));
+
+        editMessage(userId, textToSend, list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/tasks");
+        user_state.save(userS);
+    }
+
+    private void showAdministration(long userId) {
+        if (!user_table.findById(userId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Пользователи", "/showUsers"));
+        list.get(1).add(new Pair<String, String>("Сбросить очки", "/dropAllPoints"));
+        list.get(1).add(new Pair<String, String>("Задачи", "/adminTasks"));
+        list.get(2).add(new Pair<String, String>("Назад", "/menu"));
+        editMessage(userId, "Меню администратора:", list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/administration");
+        user_state.save(userS);
+    }
+
+    private void showRating(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Назад", "/menu"));
+        UserSQL user = user_table.findById(userId).get();
+        Iterable<UserSQL> allUsers = user_table.findAll();
+
+        List<UserSQL> userFromCurrentChat = new ArrayList<>();
+        for (UserSQL userSQL : allUsers) {
+            if (userSQL.getChatId() == user.getChatId()) {
+                userFromCurrentChat.add(userSQL);
+            }
+        }
+
+        Collections.sort(userFromCurrentChat);
+        String textToSend = "Рейтинг пользователей:\n\n";
+        int pos = 1;
+        for (UserSQL userSQL : userFromCurrentChat) {
+            if (user.getUserId() == userSQL.getUserId()) {
+                textToSend += "<b>%d. @%s (%s %s) - %d</b>\n".formatted(pos, userSQL.getUserName(),
+                        userSQL.getFirstName(),
+                        userSQL.getLastName(), userSQL.getPoints());
+            } else {
+                textToSend += "%d. @%s (%s %s) - %d\n".formatted(pos, userSQL.getUserName(), userSQL.getFirstName(),
+                        userSQL.getLastName(), userSQL.getPoints());
+            }
+            pos++;
+        }
+
+        editMessage(userId, textToSend, list);
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/rating");
+        user_state.save(userS);
+    }
+
+    private void showUnderConstruct(Long userId, Pair<String, String> pair) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(pair);
+        sendMessageWithPicture(userId, "Этот раздел пока ещё в разработке!",
+                cats[ThreadLocalRandom.current().nextInt(0, 3)], list);
+    }
+
+    // ИЗУЧИТЬ ТЕМУ С ЗАПРОСАМИ ЧЕРЕЗ HIBERNATE (ПОТОМУ ЧТО chat_id не является @Id)
+    private void showUsers(long userId) {
+        if (!user_table.findById(userId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+
+        long chatId = user_table.findById(userId).get().getChatId();
+        Iterable<UserSQL> allUsers = user_table.findAll();
+        List<UserSQL> users = new ArrayList<>();
+        for (UserSQL userSQL : allUsers) {
+            if (userSQL.getChatId() == chatId) {
+                users.add(userSQL);
+            }
+        }
+
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        for (int i = 0; i < users.size(); i++) {
+            list.add(new ArrayList<>());
+            list.get(i)
+                    .add(new Pair<String, String>(users.get(i).getUserName(),
+                            "/showUserInfo " + users.get(i).getUserId()));
+        }
+        list.add(new ArrayList<>());
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/administration"));
+        editMessage(userId, "Список пользователей в беседе:", list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/showUsers");
+        user_state.save(userS);
+        // Query query = session.createQuery("FROM user_table WHERE chat_id = :chatId");
+        // Query query = org.hibernate.Session.createQuery("FROM user_table WHERE
+        // chat_id = :chatId");
+        // query.setParameter();
+    }
+
+    private void showUserInfo(long chatId, long userId) {
+        if (!user_table.findById(chatId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+        UserSQL user = user_table.findById(userId).get();
+
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        if (chatId == userId) {
+
+        } else {
+            list.add(new ArrayList<>());
+            if (user_table.findById(userId).get().isAdmin()) {
+                list.get(0)
+                        .add(new Pair<String, String>("Забрать админку",
+                                "/takeAdministrationRights " + user.getUserId()));
+            } else {
+                list.get(0)
+                        .add(new Pair<String, String>("Выдать админку",
+                                "/giveAdministrationRights " + user.getUserId()));
+            }
+        }
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/showUsers"));
+
+        editMessage(chatId, "Профиль пользователя <b>%s</b>:".formatted(user.getUserName()) +
+                "\n\n<b>Имя:</b> \t" + user.getFirstName() +
+                "\n<b>Права администратора:</b> \t" + user.isAdmin() +
+                "\n<b>Количество очков:</b> \t" + user.getPoints() +
+                "\n<b>Количество активных задач:</b> \t"
+                + getIdsFromString(user.getActiveTasks(), ";").size(), list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/showUserInfo");
+        user_state.save(userS);
+    }
+
+    private void giveAdministrationRights(Long chatId, Long userId) {
+        UserSQL user = user_table.findById(userId).get();
+        user.setIsAdmin(true);
+        user_table.save(user);
+
+        showUserInfo(chatId, userId);
+    }
+
+    private void takeAdministrationRights(Long chatId, Long userId) {
+        UserSQL user = user_table.findById(userId).get();
+        user.setIsAdmin(false);
+        user_table.save(user);
+
+        showUserInfo(chatId, userId);
+    }
+
+    private void createItems(List<ItemSQL> list) {
+        for (ItemSQL item : list) {
+            item_table.save(item);
+        }
+    }
+
+    private void giveItem(Long userId, Long itemId) {
+        UserHero hero = user_hero.findById(userId).get();
+        hero.addToInventory(itemId);
+        user_hero.save(hero);
+
+        sendMessage(userId, "Вы получили предмет <b>%s</b>!".formatted(item_table.findById(itemId).get().toString()));
+    }
+
+    //
+    // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
+    //
+
+    private List<Long> getIdsFromString(String text, String separator) {
+        List<Long> list = new ArrayList<>();
+        if (text == null) {
+            return list;
+        }
+
+        String[] strList = text.split(separator);
+        for (String element : strList) {
+            list.add(Long.valueOf(element));
+        }
+        return list;
     }
 
     //
@@ -678,125 +1041,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    /*
-     * private void createTask(Message message, byte step) {
-     * UserState user = user_state.findById(message.getFrom().getId()).get();
-     * if (message.getChat().isUserChat()) {
-     * if (!user_table.findById(message.getFrom().getId()).isEmpty()) {
-     * if (user_table.findById(message.getFrom().getId()).get().isAdmin()) {
-     * 
-     * switch (step) {
-     * case 1:
-     * sendMessage(message.getFrom().getId(),
-     * message.getChat().getFirstName() + ", приступим к созданию задания");
-     * log.info("Start creating task " + message.getChat().getFirstName());
-     * createTask(message, (byte) 2);
-     * break;
-     * case 2:
-     * sendMessage(message.getFrom().getId(),
-     * "Введите название задания");
-     * user.setWaitForRequest(true);
-     * user.setStep((byte) 3);
-     * user_state.save(user);
-     * break;
-     * case 3:
-     * user.setLastUserMessage(message.getText());
-     * sendMessage(message.getFrom().getId(),
-     * "Проверьте, все так? <b><i>%s</i></b>!"
-     * .formatted(user.getLastUserMessage()), new String[][] { { "Да", "Нет" } });
-     * user.setWaitForRequest(true);
-     * user.setStep((byte) 4);
-     * user_state.save(user);
-     * break;
-     * case 4:
-     * switch (message.getText()) {
-     * case "Да", "да":
-     * TaskSQL task = new TaskSQL();
-     * 
-     * Long randomInt;
-     * do {
-     * randomInt = ThreadLocalRandom.current().nextLong(0, 10000);
-     * } while (!task_table.findById((long) randomInt).isEmpty());
-     * 
-     * task.setTaskId(randomInt);
-     * task.setCreatorId(message.getFrom().getId());
-     * task.setTaskName(user.getLastUserMessage());
-     * task.setTaskType("real life task");
-     * task_table.save(task);
-     * 
-     * sendMessage(message.getFrom().getId(),
-     * "Введите описание задания");
-     * 
-     * user.setWaitForRequest(true);
-     * user.setStep(5);
-     * user_state.save(user);
-     * break;
-     * case "Нет", "нет":
-     * createTask(message, (byte) 2);
-     * user.setStep(2);
-     * user_state.save(user);
-     * break;
-     * default:
-     * break;
-     * }
-     * case 5:
-     * user.setLastUserMessage(message.getText());
-     * user.setWaitForRequest(true);
-     * sendMessage(message.getFrom().getId(),
-     * "Проверьте, все так? <b><i>%s</i></b>!"
-     * .formatted(user.getLastUserMessage()), new String[][] { { "Да", "Нет" } });
-     * 
-     * user.setStep((byte) 6);
-     * user_state.save(user);
-     * break;
-     * case 6:
-     * switch (message.getText()) {
-     * case "Да", "да":
-     * TaskSQL task = task_table.findById(message.getFrom().getId()).get();
-     * task.setTaskDescription(user.getLastUserMessage());
-     * task_table.save(task);
-     * user.setProcess(null);
-     * user_state.save(user);
-     * 
-     * List<List<Pair<String, String>>> list = new ArrayList<>();
-     * list.add(new ArrayList<>());
-     * list.get(0).add(new Pair<String, String>("Принять", "/task_agree"));
-     * sendMessageWithInlineButtons(message.getFrom().getId(),
-     * "Задание: " + task.getTaskName(),
-     * list);
-     * sendMessage(message.getFrom().getId(), "Создание задания завершено! ");
-     * break;
-     * case "Нет", "нет":
-     * createTask(message, (byte) 4);
-     * user.setStep(4);
-     * user_state.save(user);
-     * break;
-     * default:
-     * break;
-     * }
-     * break;
-     * 
-     * default:
-     * break;
-     * }
-     * } else {
-     * sendMessage(message.getChatId(), "Вы не администратор");
-     * user.setProcess(null);
-     * user_state.save(user);
-     * }
-     * } else {
-     * user.setProcess(null);
-     * user_state.save(user);
-     * sendMessage(message.getFrom().getId(), "Вы не зарегистрированны");
-     * }
-     * } else {
-     * sendMessage(message.getChatId(),
-     * "Используйте эту команду в личных сообщениях с ботом!");
-     * user.setProcess(null);
-     * user_state.save(user);
-     * }
-     * }
-     */
     private ReplyKeyboardMarkup createReplyKeyboard(String[][] arrStr) {
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboardRows = new ArrayList<>();
@@ -869,6 +1113,32 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occurred: " + e.getMessage());
         }
 
+    }
+
+    private void editMessage(long chatId, String newMessage, List<List<Pair<String, String>>> buttons) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(user_state.findById(chatId).get().getIdLastBotMessage());
+        editMessageText.setText(newMessage);
+        editMessageText.setReplyMarkup(createInlineKeyboard(buttons));
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void deleteLastMessage(long chatId) {
+        DeleteMessage deleteMessage = new DeleteMessage(String.valueOf(chatId),
+                user_state.findById(chatId).get().getIdLastBotMessage());
+
+        try {
+            execute(deleteMessage);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
     }
 
     private void sendMessageWithInlineButtons(long chatId, String textToSend, String[][] buttons) {
@@ -957,6 +1227,27 @@ public class TelegramBot extends TelegramLongPollingBot {
         photo.setChatId(String.valueOf(chatId));
         photo.setCaption(textToSend);
         photo.setPhoto(new InputFile(imageUrlToSend));
+
+        try {
+            Message msg = execute(photo);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user_state.save(user);
+            }
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void sendMessageWithPicture(long chatId, String textToSend, String imageUrlToSend,
+            List<List<Pair<String, String>>> buttons) {
+        SendPhoto photo = new SendPhoto();
+        photo.setChatId(String.valueOf(chatId));
+        photo.setCaption(textToSend);
+        photo.setPhoto(new InputFile(imageUrlToSend));
+        photo.setReplyMarkup(createInlineKeyboard(buttons));
 
         try {
             Message msg = execute(photo);
