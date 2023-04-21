@@ -6,15 +6,21 @@ import io.project.TestBot.model.UserSQL;
 import io.project.TestBot.model.UserState;
 import io.project.TestBot.model.User_hero;
 import io.project.TestBot.model.User_state;
+import io.project.TestBot.model.ItemSQL;
+import io.project.TestBot.model.Item_table;
 import io.project.TestBot.model.TaskSQL;
 import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import org.glassfish.grizzly.utils.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +58,8 @@ import lombok.extern.slf4j.Slf4j;
 public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
+    private Item_table item_table;
+    @Autowired
     private User_state user_state;
     @Autowired
     private User_table user_table;
@@ -77,6 +85,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             execute(new SetMyCommands(listOfCommands, new BotCommandScopeDefault(), null));
             execute(new SendMessage(String.valueOf(778258104), "Я проснувся!"));
+
+            // ItemSQL item = new ItemSQL();
+            // item.setItemId(Long.valueOf(1));
+            // item.setItemName("яблоко");
+            // item.setItemType("heal");
+            // item.setItemLevel(1);
+            // item_table.save(item);
         } catch (TelegramApiException e) {
             log.error("Error setting bot`s command list: " + e.getMessage());
         }
@@ -111,7 +126,12 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
 
         if (update.hasMessage() && update.getMessage().hasText()) {
-            String messageText = update.getMessage().getText();
+            String messageText;
+            if (update.getMessage().getText().split(" ").length > 1) {
+                messageText = update.getMessage().getText().split(" ")[0];
+            } else {
+                messageText = update.getMessage().getText();
+            }
             long chatId = update.getMessage().getFrom().getId();
             UserState user;
 
@@ -207,7 +227,43 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/administration", "/administration@tstbtstst_bot":
                             showAdministration(update.getMessage().getFrom().getId());
                             break;
-
+                        case "/rating", "/rating@tstbtstst_bot":
+                            showRating(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showUsers", "/showUsers@tstbtstst_bot":
+                            showUsers(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showUserInfo", "/showUserInfo@tstbtstst_bot":
+                            showUserInfo(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/takeAdministrationRights", "/takeAdministrationRights@tstbtstst_bot":
+                            takeAdministrationRights(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/giveAdministrationRights", "/giveAdministrationRights@tstbtstst_bot":
+                            giveAdministrationRights(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/giveItem", "/giveItem@tstbtstst_bot":
+                            giveItem(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/heroInventory", "/heroInventory@tstbtstst_bot":
+                            showHeroInventory(update.getMessage().getFrom().getId());
+                            break;
+                        case "/createItems":
+                            List<ItemSQL> list = new ArrayList<>();
+                            list.add(new ItemSQL((long) 1, "яблоко", "heal", 1));
+                            list.add(new ItemSQL((long) 2, "палка-убивалка", "weapon", 1));
+                            list.add(new ItemSQL((long) 3, "клоунский колпак", "head", 1));
+                            list.add(new ItemSQL((long) 4, "алмазный нагрудник", "chest", 1));
+                            list.add(new ItemSQL((long) 5, "штаны из берёзовый коры", "legs", 1));
+                            list.add(new ItemSQL((long) 6, "сапоги-скороходы", "foots", 1));
+                            list.add(new ItemSQL((long) 7, "кольцо всевластия", "talisman", 1));
+                            list.add(new ItemSQL((long) 8, "тетрадь в горошек", "loot", 1));
+                            createItems(list);
+                            break;
                         default:
                             sendMessage(chatId, "Не понимаю команду!");
                             user.setLastUserMessage(null);
@@ -376,7 +432,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 && (user_state.findById(userId).get().getLastUserMessage().equals("/profile")
                         || user_state.findById(userId).get().getLastUserMessage().equals("/hero")
                         || user_state.findById(userId).get().getLastUserMessage().equals("/tasks")
-                        || user_state.findById(userId).get().getLastUserMessage().equals("/administration"))) {
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/administration")
+                        || user_state.findById(userId).get().getLastUserMessage().equals("/rating"))) {
             editMessage(userId, "Меню:", list);
         } else {
             sendMessageWithInlineButtons(userId, "Меню:", list);
@@ -414,7 +471,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             textToSend = "У Вас нет героя!\nИспользуйте /create_hero, чтобы создать его!";
 
         } else {
-            textToSend = "Меню герой:";
+            textToSend = "Меню героя:";
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
             list.get(0).add(new Pair<String, String>("Информация", "/heroInfo"));
@@ -429,6 +486,24 @@ public class TelegramBot extends TelegramLongPollingBot {
         UserState user = user_state.findById(userId).get();
         user.setLastUserMessage("/hero");
         user_state.save(user);
+    }
+
+    private void showHeroInventory(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Назад", "/hero"));
+
+        String textToSend = "Инвентарь:\n\n";
+        UserHero hero = user_hero.findById(userId).get();
+        List<Long> items = getIdsFromString(hero.getInventory(), ";");
+        if (items.isEmpty()) {
+            textToSend += "Ваш инвентарь пуст!";
+        } else {
+            for (Long itemId : items) {
+                textToSend += item_table.findById(itemId).get().toString() + "\n";
+            }
+        }
+        editMessage(userId, textToSend, list);
     }
 
     private void showTasksList(long userId) {
@@ -476,6 +551,39 @@ public class TelegramBot extends TelegramLongPollingBot {
         user_state.save(userS);
     }
 
+    private void showRating(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Назад", "/menu"));
+        UserSQL user = user_table.findById(userId).get();
+        Iterable<UserSQL> allUsers = user_table.findAll();
+
+        List<UserSQL> userFromCurrentChat = new ArrayList<>();
+        for (UserSQL userSQL : allUsers) {
+            if (userSQL.getChatId() == user.getChatId()) {
+                userFromCurrentChat.add(userSQL);
+            }
+        }
+
+        Collections.sort(userFromCurrentChat);
+        String textToSend = "Рейтинг пользователей:\n\n";
+        for (UserSQL userSQL : userFromCurrentChat) {
+            if (user.getUserId() == userSQL.getUserId()) {
+                textToSend += "<b>@%s (%s %s) - %d</b>\n".formatted(userSQL.getUserName(), userSQL.getFirstName(),
+                        userSQL.getLastName(), userSQL.getPoints());
+            } else {
+                textToSend += "@%s (%s %s) - %d\n".formatted(userSQL.getUserName(), userSQL.getFirstName(),
+                        userSQL.getLastName(), userSQL.getPoints());
+            }
+        }
+
+        editMessage(userId, textToSend, list);
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/rating");
+        user_state.save(userS);
+    }
+
+    // ИЗУЧИТЬ ТЕМУ С ЗАПРОСАМИ ЧЕРЕЗ HIBERNATE (ПОТОМУ ЧТО chat_id не является @Id)
     private void showUsers(long userId) {
         if (!user_table.findById(userId).get().isAdmin()) {
             sendMessage(userId, "Вы не обладаете правами администратора!");
@@ -483,10 +591,99 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
 
         long chatId = user_table.findById(userId).get().getChatId();
+        Iterable<UserSQL> allUsers = user_table.findAll();
+        List<UserSQL> users = new ArrayList<>();
+        for (UserSQL userSQL : allUsers) {
+            if (userSQL.getChatId() == chatId) {
+                users.add(userSQL);
+            }
+        }
+
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        for (int i = 0; i < users.size(); i++) {
+            list.add(new ArrayList<>());
+            list.get(i)
+                    .add(new Pair<String, String>(users.get(i).getUserName(),
+                            "/showUserInfo " + users.get(i).getUserId()));
+        }
+        list.add(new ArrayList<>());
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/administration"));
+        editMessage(userId, "Список пользователей в беседе:", list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/showUsers");
+        user_state.save(userS);
         // Query query = session.createQuery("FROM user_table WHERE chat_id = :chatId");
         // Query query = org.hibernate.Session.createQuery("FROM user_table WHERE
         // chat_id = :chatId");
         // query.setParameter();
+    }
+
+    private void showUserInfo(long chatId, long userId) {
+        if (!user_table.findById(chatId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+        UserSQL user = user_table.findById(userId).get();
+
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        if (chatId == userId) {
+
+        } else {
+            list.add(new ArrayList<>());
+            if (user_table.findById(userId).get().isAdmin()) {
+                list.get(0)
+                        .add(new Pair<String, String>("Забрать админку",
+                                "/takeAdministrationRights " + user.getUserId()));
+            } else {
+                list.get(0)
+                        .add(new Pair<String, String>("Выдать админку",
+                                "/giveAdministrationRights " + user.getUserId()));
+            }
+        }
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/showUsers"));
+
+        editMessage(chatId, "Профиль пользователя <b>%s</b>:".formatted(user.getUserName()) +
+                "\n\n<b>Имя:</b> \t" + user.getFirstName() +
+                "\n<b>Права администратора:</b> \t" + user.isAdmin() +
+                "\n<b>Количество очков:</b> \t" + user.getPoints() +
+                "\n<b>Количество активных задач:</b> \t"
+                + getIdsFromString(user.getActiveTasks(), ";").size(), list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/showUserInfo");
+        user_state.save(userS);
+    }
+
+    private void giveAdministrationRights(Long chatId, Long userId) {
+        UserSQL user = user_table.findById(userId).get();
+        user.setIsAdmin(true);
+        user_table.save(user);
+
+        showUserInfo(chatId, userId);
+    }
+
+    private void takeAdministrationRights(Long chatId, Long userId) {
+        UserSQL user = user_table.findById(userId).get();
+        user.setIsAdmin(false);
+        user_table.save(user);
+
+        showUserInfo(chatId, userId);
+    }
+
+    private void createItems(List<ItemSQL> list) {
+        for (ItemSQL item : list) {
+            item_table.save(item);
+        }
+    }
+
+    private void giveItem(Long userId, Long itemId) {
+        UserHero hero = user_hero.findById(userId).get();
+        hero.addToInventory(itemId);
+        user_hero.save(hero);
+
+        sendMessage(userId, "Вы получили предмет <b>%s</b>!".formatted(item_table.findById(itemId).get().toString()));
     }
 
     //
