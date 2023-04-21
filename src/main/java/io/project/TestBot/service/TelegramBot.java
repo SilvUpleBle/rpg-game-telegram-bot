@@ -200,6 +200,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user.setProcess(null); // ПЕРЕДЕЛАТЬ
                             user_state.save(user); // ПЕРЕДЕЛАТЬ
                             break; // ПЕРЕДЕЛАТЬ
+                        //
                         case "/cancel", "/cancel@tstbtstst_bot":
                             cancelWithText(update.getMessage().getFrom().getId());
                             break;
