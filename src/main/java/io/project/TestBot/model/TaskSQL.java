@@ -44,7 +44,7 @@ public class TaskSQL {
         if (this.recipientId.isEmpty()) {
             this.recipientId = recipientId;
         } else {
-            this.recipientId += ", %s".formatted(recipientId);
+            this.recipientId += ";%s".formatted(recipientId);
         }
     }
 

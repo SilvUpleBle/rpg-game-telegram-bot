@@ -15,8 +15,6 @@ public class UserHero {
 
     private String heroName;
 
-    private String gameRole;
-
     private int forcePower;
 
     private int currentHealth;
@@ -28,6 +26,8 @@ public class UserHero {
     private String inventory = "";
 
     private String equipment = ";;;;;";
+
+    private Long idGroup;
 
     public long getUserId() {
         return userId;
@@ -43,14 +43,6 @@ public class UserHero {
 
     public void setHeroName(String heroName) {
         this.heroName = heroName;
-    }
-
-    public String getGameRole() {
-        return gameRole;
-    }
-
-    public void setGameRole(String gameRole) {
-        this.gameRole = gameRole;
     }
 
     public long getForcePower() {
@@ -125,6 +117,14 @@ public class UserHero {
 
     public void setMoney(int money) {
         this.money = money;
+    }
+
+    public Long getIdGroup() {
+        return idGroup;
+    }
+
+    public void setIdGroup(Long idGroup) {
+        this.idGroup = idGroup;
     }
 
 }
