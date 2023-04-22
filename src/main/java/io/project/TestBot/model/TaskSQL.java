@@ -24,6 +24,26 @@ public class TaskSQL {
 
     private String taskType;
 
+    private Integer messageId;
+
+    private Integer capacity;
+
+    public Integer getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(Integer capacity) {
+        this.capacity = capacity;
+    }
+
+    public Integer getMessageId() {
+        return messageId;
+    }
+
+    public void setMessageId(Integer messageId) {
+        this.messageId = messageId;
+    }
+
     public Long getTaskId() {
         return taskId;
     }
@@ -41,7 +61,7 @@ public class TaskSQL {
     }
 
     public void addRecipientId(String recipientId) {
-        if (this.recipientId.isEmpty()) {
+        if (this.recipientId == null) {
             this.recipientId = recipientId;
         } else {
             this.recipientId += ";%s".formatted(recipientId);
