@@ -104,6 +104,14 @@ public class UserSQL implements Comparable<UserSQL> {
         this.activeTasks = activeTasks;
     }
 
+    public void addActiveTasks(String activeTasks) {
+        if (this.activeTasks == null) {
+            this.activeTasks = activeTasks;
+        } else {
+            this.activeTasks += ";%s".formatted(activeTasks);
+        }
+    }
+
     @Override
     public int compareTo(UserSQL user) {
         if (this.points == user.getPoints()) {
