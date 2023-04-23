@@ -741,11 +741,77 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void shopGenerator() {
-        // ShopSQL shop = shop_table
+        if (shop_table.count() != 0) {
+            ShopSQL shop = shop_table.findByShopId(shopId);
+            shop_table.delete(shop);
+        }
         ShopSQL shop = new ShopSQL();
+
         Long random = ThreadLocalRandom.current().nextLong(0, 10000);
         shopId = random;
         shop.setShopId(random);
+        List<ItemSQL> itemsList = item_table.findByAllItemType("weapon");
+        String str = "";
+        for (int j = 0; j < 5; j++) {
+            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+            str += itemsList.get(rnd).getItemId() + ";";
+
+        }
+        shop.setWeapon(str.split(";"));
+        itemsList = item_table.findByAllItemType("head");
+        str = "";
+        for (int j = 0; j < 5; j++) {
+            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+            str += itemsList.get(rnd).getItemId() + ";";
+
+        }
+        shop.setHead(str.split(";"));
+
+        itemsList = item_table.findByAllItemType("chest");
+        str = "";
+        for (int j = 0; j < 5; j++) {
+            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+            str += itemsList.get(rnd).getItemId() + ";";
+
+        }
+        shop.setChest(str.split(";"));
+
+        itemsList = item_table.findByAllItemType("legs");
+        str = "";
+        for (int j = 0; j < 5; j++) {
+            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+            str += itemsList.get(rnd).getItemId() + ";";
+
+        }
+        shop.setLegs(str.split(";"));
+
+        itemsList = item_table.findByAllItemType("foots");
+        str = "";
+        for (int j = 0; j < 5; j++) {
+            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+            str += itemsList.get(rnd).getItemId() + ";";
+
+        }
+        shop.setFoots(str.split(";"));
+
+        itemsList = item_table.findByAllItemType("talisman");
+        str = "";
+        for (int j = 0; j < 5; j++) {
+            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+            str += itemsList.get(rnd).getItemId() + ";";
+
+        }
+        shop.setTalisman(str.split(";"));
+
+        itemsList = item_table.findByAllItemType("heal");
+        str = "";
+        for (int j = 0; j < 5; j++) {
+            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+            str += itemsList.get(rnd).getItemId() + ";";
+
+        }
+        shop.setHeal(str.split(";"));
+        shop_table.save(shop);
     }
 
     private void showHospital(long userId) {
