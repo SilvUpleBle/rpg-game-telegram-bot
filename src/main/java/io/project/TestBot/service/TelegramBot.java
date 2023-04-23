@@ -742,8 +742,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void shopGenerator() {
         if (shop_table.count() != 0) {
-            ShopSQL shop = shop_table.findByShopId(shopId);
-            shop_table.delete(shop);
+            shop_table.deleteAll();
         }
         ShopSQL shop = new ShopSQL();
 
