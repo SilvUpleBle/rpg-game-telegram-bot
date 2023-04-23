@@ -15,17 +15,17 @@ public class UserHero {
 
     private String heroName;
 
-    private int forcePower;
+    private int forcePower = 0;
 
-    private int currentHealth;
+    private String health = "10/10";
 
-    private int maxHealth;
+    private int money = 0;
 
-    private int money;
+    private int points = 0;
 
     private String inventory = "";
 
-    private String equipment = ";;;;;";
+    private String equipment = "0;0;0;0;0;0";
 
     private Long idGroup;
 
@@ -87,28 +87,20 @@ public class UserHero {
         }
     }
 
-    public String getEquipment() {
-        return equipment;
+    public String[] getEquipment() {
+        return equipment.split(";");
     }
 
-    public void setEquipment(String equipment) {
-        this.equipment = equipment;
-    }
-
-    public int getCurrentHealth() {
-        return currentHealth;
-    }
-
-    public void setCurrentHealth(int currentHealth) {
-        this.currentHealth = currentHealth;
-    }
-
-    public int getMaxHealth() {
-        return maxHealth;
-    }
-
-    public void setMaxHealth(int maxHealth) {
-        this.maxHealth = maxHealth;
+    public void changeEquipment(int item, Long equipmentId) {
+        String[] equip = equipment.split(";");
+        if (!equip[item].equals("0")) {
+            this.addToInventory(Long.valueOf(equip[item]));
+        }
+        equip[item] = String.valueOf(equipmentId);
+        equipment = equip[0];
+        for (int i = 1; i < equip.length; i++) {
+            equipment += ";" + equip[i];
+        }
     }
 
     public int getMoney() {
@@ -127,4 +119,54 @@ public class UserHero {
         this.idGroup = idGroup;
     }
 
+    public String getHealth() {
+        return health;
+    }
+
+    public void setHealth(String health) {
+        this.health = health;
+    }
+
+    public void setCurrentHealth(int hp) {
+        String[] pair = health.split("/");
+        if (hp > Integer.valueOf(pair[1])) {
+            pair[0] = pair[1];
+        } else {
+            pair[0] = String.valueOf(hp);
+        }
+        health = pair[0] + "/" + pair[1];
+    }
+
+    public int getCurrentHealth() {
+        return Integer.valueOf(health.split("/")[0]);
+    }
+
+    public void setMaxHealth(int hp) {
+        String[] pair = health.split("/");
+        pair[1] = String.valueOf(hp);
+        if (hp > Integer.valueOf(pair[0])) {
+            pair[0] = String.valueOf(hp);
+        }
+        health = pair[0] + "/" + pair[1];
+    }
+
+    public int getMaxHealth() {
+        return Integer.valueOf(health.split("/")[1]);
+    }
+
+    public int getPoints() {
+        return points;
+    }
+
+    public void setPoints(int points) {
+        this.points = points;
+    }
+
+    public void addPoints(int points) {
+        this.points += points;
+    }
+
+    public void subPoints(int points) {
+        this.points -= points;
+    }
 }

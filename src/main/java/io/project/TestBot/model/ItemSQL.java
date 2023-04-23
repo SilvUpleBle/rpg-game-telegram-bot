@@ -63,6 +63,10 @@ public class ItemSQL {
     // стрелочка вверх "\u2B06"
     // стрелочка вниз "\u2B07"
     public String toString() {
+        return itemName + " lv." + itemLevel;
+    }
+
+    public String toStringWithType() {
         return EmojiParser.parseToUnicode(typeToEmoji()) + " " + itemName + " lv." + itemLevel;
     }
 
