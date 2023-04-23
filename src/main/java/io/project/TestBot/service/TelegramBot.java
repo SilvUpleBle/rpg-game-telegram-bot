@@ -676,6 +676,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void showHospital(long userId) {
+        UserHero hero = user_hero.findByUserId(userId).get();
         List<List<Pair<String, String>>> list = new ArrayList<>();
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
@@ -693,7 +694,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 "/travelTo town hospital 4"));
         list.get(2).add(new Pair<String, String>("Назад", "/travelTo town"));
         editMenuMessage(userId,
-                "Лавка целителя\n Можете выбрать способ лечения, который вам по карману",
+                "Лавка целителя\n Можете выбрать способ лечения, который вам по карману\n Ваше здоровье: "
+                        + hero.getCurrentHealth() + "/" + hero.getMaxHealth() + "\n Кошелек: " + hero.getMoney(),
                 list);
     }
 
@@ -711,19 +713,19 @@ public class TelegramBot extends TelegramLongPollingBot {
             if (hero.getMoney() >= health * 2) {
                 textToSend = "Так ну вроде бы здоров)";
                 list.get(0).add(new Pair<String, String>("Назад", "/travelTo town hospital"));
-                hero.setCurrentHealth(health);
-                hero
+                hero.setCurrentHealth(hero.getCurrentHealth() + health);
+                hero.setMoney(hero.getMoney() - health * 2);
+                user_hero.save(hero);
 
             } else {
-                textToSend = EmojiParser.parseToUnicode(":rage:") +" Иди отсюда бродяга, возвращайся если денег наскребешь!";
+                textToSend = EmojiParser.parseToUnicode(":rage:")
+                        + " Иди отсюда бродяга, возвращайся если денег наскребешь!";
                 list.get(0).add(new Pair<String, String>("Назад", "/travelTo town"));
             }
 
         }
 
-        editMenuMessage(userId,
-                textToSend,
-                list);
+        editMenuMessage(userId, textToSend, list);
 
     }
 
