@@ -1740,6 +1740,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMenuMessage(chatId, newMessage, buttons);
         }
     }
+
     private void editMessage(long chatId, String newMessage) {
         EditMessageText editMessageText = new EditMessageText();
         editMessageText.setChatId(String.valueOf(chatId));
@@ -1879,6 +1880,25 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         inlineKeyboardMarkup.setKeyboard(rowList);
         return inlineKeyboardMarkup;
+    }
+
+    private void sendMessageWithLastMessageId(long chatId, String textToSend, Long taskId,
+            List<List<Pair<String, String>>> buttons) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        message.enableHtml(true);
+        message.setReplyMarkup(createInlineKeyboard(buttons));
+
+        try {
+            Message msg = execute(message);
+            TaskSQL task = task_table.findByTaskId(taskId);
+            task.setMessageId(msg.getMessageId());
+            task_table.save(task);
+
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
     }
 
     private void sendMessageWithPicture(long chatId, String textToSend, String imageUrlToSend) {
