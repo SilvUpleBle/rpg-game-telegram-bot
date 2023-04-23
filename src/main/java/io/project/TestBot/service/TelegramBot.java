@@ -739,6 +739,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                 list);
     }
 
+    private void shopGenerator() {
+        
+    }
+
     private void showHospital(long userId) {
         UserHero hero = user_hero.findByUserId(userId).get();
         List<List<Pair<String, String>>> list = new ArrayList<>();
@@ -762,10 +766,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                         + hero.getCurrentHealth() + "/" + hero.getMaxHealth() + "\n Кошелек: " + hero.getMoney()
                         + " злотых",
                 list);
-    }
-
-    private void shopGenerator() {
-
     }
 
     private void hospitalHeal(long userId, Integer health) {
