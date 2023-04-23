@@ -16,7 +16,6 @@ import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -171,6 +170,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/delete_hero":
                         deleteHero(update.getMessage(), (byte) user.getStep());
                         break;
+                    case "/createGroup":
+                        user.setLastUserMessage(update.getMessage().getText());
+                        user_state.save(user);
+                        createGroup(update.getMessage().getFrom().getId());
+                        break;
                     default:
                         break;
 
@@ -231,7 +235,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user_state.save(user);
                             showCreatorsTasks(update.getMessage());
                             break;
-
                         case "/get_rights", "/get_rights@tstbtstst_bot":
                             getAdminRights(update.getMessage());
                             break;
@@ -290,6 +293,44 @@ public class TelegramBot extends TelegramLongPollingBot {
                             break;
                         case "/deleteGroup", "/deleteGroup@tstbtstst_bot":
                             deleteGroup(update.getMessage().getFrom().getId());
+                            break;
+                        case "/createGroup", "/createGroup@tstbtstst_bot":
+                            user.setProcess("/createGroup");
+                            user.setStep(1);
+                            user_state.save(user);
+                            createGroup(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showInviteToGroup", "/showInviteToGroup@tstbtstst_bot":
+                            showInviteToGroup(update.getMessage().getFrom().getId());
+                            break;
+                        case "/inviteToGroup", "/inviteToGroup@tstbtstst_bot":
+                            inviteToGroup(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/acceptInviteToGroup", "/acceptInviteToGroup@tstbtstst_bot":
+                            acceptInviteToGroup(Long.valueOf(update.getMessage().getText().split(" ")[1]),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[2]));
+                            break;
+                        case "/refuseInviteToGroup", "/refuseInviteToGroup@tstbtstst_bot":
+                            refuseInviteToGroup(Long.valueOf(update.getMessage().getText().split(" ")[1]),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[2]));
+                            break;
+                        case "/excludeFromGroup", "/excludeFromGroup@tstbtstst_bot":
+                            excludeFromGroup(Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/travelTo", "/travelTo@tstbtstst_bot":
+                            if (update.getMessage().getText().split(" ").length == 1) {
+                                showTravelTo(update.getMessage().getFrom().getId());
+                            } else {
+                                switch (update.getMessage().getText().split(" ")[1]) {
+                                    case "dungeon":
+
+                                        break;
+                                    case "town":
+
+                                        break;
+                                }
+                            }
                             break;
 
                         case "/createItems":
@@ -503,6 +544,19 @@ public class TelegramBot extends TelegramLongPollingBot {
         user_state.save(userS);
     }
 
+    private void showTravelTo(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>(
+                "Подземелье" + EmojiParser.parseToUnicode(":crossed_swords:"), "/travelTo dungeon"));
+        list.get(1).add(
+                new Pair<String, String>("Город" + EmojiParser.parseToUnicode(":european_castle:"), "/travelTo town"));
+        list.get(2).add(new Pair<String, String>("Назад", "/hero"));
+        editMessage(userId, "Куда вы желаете отправиться?", list);
+    }
+
     private void showHero(long userId) {
         List<List<Pair<String, String>>> list = new ArrayList<>();
         list.add(new ArrayList<>());
@@ -515,11 +569,14 @@ public class TelegramBot extends TelegramLongPollingBot {
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
+            list.add(new ArrayList<>());
             list.get(0).add(new Pair<String, String>("Информация", "/heroInfo"));
             list.get(0).add(new Pair<String, String>("Экипировка", "/heroEquipment"));
             list.get(1).add(new Pair<String, String>("Инвентарь", "/heroInventory"));
             list.get(1).add(new Pair<String, String>("Питомец" + EmojiParser.parseToUnicode(":hammer:"), "/heroPet"));
             list.get(2).add(new Pair<String, String>("Группа", "/heroGroup"));
+            list.get(3).add(new Pair<String, String>("Отаправиться в..." + EmojiParser.parseToUnicode(":runner:"),
+                    "/travelTo"));
         }
 
         list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
@@ -573,8 +630,34 @@ public class TelegramBot extends TelegramLongPollingBot {
         editMessage(userId, textToSend, list);
     }
 
+    private void createGroup(Long userId) {
+        UserState user = user_state.findById(userId).get();
+        switch (user.getStep()) {
+            case 1:
+                sendMessage(userId, "Введите название группы!");
+                user.setStep(2);
+                user.setWaitForRequest(true);
+                user_state.save(user);
+                break;
+            case 2:
+                sendMessage(userId, "Группа <b>%s</b> создана!".formatted(user.getLastUserMessage()));
+                GroupSQL group = new GroupSQL();
+                group.setGroupName(user.getLastUserMessage());
+                group.setIdLeader(userId);
+                group.addUser(userId);
+                group = hero_groups.save(group);
+                UserHero hero = user_hero.findById(userId).get();
+                hero.setIdGroup(group.getIdGroup());
+                user_hero.save(hero);
+                user.setProcess(null);
+                user_state.save(user);
+                break;
+        }
+    }
+
     private void showHeroGroupList(Long userId) {
         List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
         list.add(new ArrayList<>());
         String textToSend = "Состав группы:\n\n";
         GroupSQL group = hero_groups.findById(user_hero.findById(userId).get().getIdGroup()).get();
@@ -584,10 +667,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                     user_hero.findById(Long.valueOf(users[0])).get().getHeroName(),
                     user_table.findById(Long.valueOf(users[0])).get().getUserName());
         } else {
-            textToSend += "%s (@%s)".formatted(
+            textToSend += EmojiParser.parseToUnicode(":crown:") + "%s (@%s)".formatted(
                     user_hero.findById(Long.valueOf(users[0])).get().getHeroName(),
                     user_table.findById(Long.valueOf(users[0])).get().getUserName());
-            ;
         }
         for (int i = 1; i < users.length; i++) {
             if (users[i].equals(String.valueOf(userId))) {
@@ -610,8 +692,92 @@ public class TelegramBot extends TelegramLongPollingBot {
                                 "/excludeFromGroup " + users[i]));
             }
         }
+        list.get(list.size() - 2).add(new Pair<String, String>("+", "/showInviteToGroup"));
         list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/heroGroup"));
         editMessage(userId, textToSend, list);
+    }
+
+    private void showInviteToGroup(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        Long groupId = user_hero.findById(userId).get().getIdGroup();
+        List<UserSQL> users = user_table.findAllByChatId(user_table.findById(userId).get().getChatId());
+        List<UserHero> heroes = new ArrayList<>();
+        for (UserSQL user : users) {
+            if (!user_hero.findById(user.getUserId()).isEmpty()) {
+                heroes.add(user_hero.findById(user.getUserId()).get());
+                if (heroes.get(heroes.size() - 1).getIdGroup() == null
+                        || !heroes.get(heroes.size() - 1).getIdGroup().equals(groupId)) {
+                    list.add(new ArrayList<>());
+                    list.get(list.size() - 2)
+                            .add(new Pair<String, String>(
+                                    "%s (%s)".formatted(heroes.get(heroes.size() - 1).getHeroName(),
+                                            user.getUserName()),
+                                    "/inviteToGroup " + heroes.get(heroes.size() - 1).getUserId()));
+
+                }
+            }
+        }
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/heroGroupList"));
+        editMessage(userId, "Пригласить пользователя:", list);
+    }
+
+    private void inviteToGroup(Long inviterId, Long inventedId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Принять", "/acceptInviteToGroup " + inventedId + " "
+                + hero_groups.findById(user_hero.findById(inviterId).get().getIdGroup()).get().getIdGroup()));
+        list.get(1).add(new Pair<String, String>("Отказаться", "/refuseInviteToGroup " + inventedId + " "
+                + hero_groups.findById(user_hero.findById(inviterId).get().getIdGroup()).get().getIdGroup()));
+
+        sendMessageWithInlineButtons(inventedId,
+                "Пользователь <b>@%s</b> пригласил Вас в группу <b>%s</b>!\n\nЕсли Вы уже состоите в какой-то группе, то принятие приглашения сменит Вашу группу на предложенную."
+                        .formatted(user_table.findById(inviterId).get().getUserName(),
+                                hero_groups.findById(user_hero.findById(inviterId).get().getIdGroup()).get()
+                                        .getGroupName()),
+                list);
+    }
+
+    private void acceptInviteToGroup(Long inventedId, Long groupId) {
+        if (hero_groups.findById(groupId).isEmpty()) {
+            editMessage(inventedId, "Данная группа уже распущена её лидером!");
+        } else {
+            GroupSQL group = hero_groups.findById(groupId).get();
+            String[] users = group.getIdUsers().split(";");
+            for (int i = 0; i < users.length; i++) {
+                sendMessage(Long.valueOf(users[i]), "Пользователь <b>@%s</b> присоединился к Вашей группе!"
+                        .formatted(user_table.findById(inventedId).get().getUserName()));
+            }
+            group.addUser(inventedId);
+            hero_groups.save(group);
+            UserHero hero = user_hero.findById(inventedId).get();
+            hero.setIdGroup(groupId);
+            user_hero.save(hero);
+            editMessage(inventedId, "Вы прняли приглашение в группу <b>%s</b>!"
+                    .formatted(hero_groups.findById(groupId).get().getGroupName()));
+        }
+    }
+
+    private void refuseInviteToGroup(Long inventedId, Long groupId) {
+        if (hero_groups.findById(groupId).isEmpty()) {
+            editMessage(inventedId, "Данная группа уже распущена её лидером!");
+        } else {
+            editMessage(inventedId, "Вы отказались от вступления в группу <b>%s</b>!"
+                    .formatted(hero_groups.findById(groupId).get().getGroupName()));
+        }
+    }
+
+    private void excludeFromGroup(Long userId) {
+        UserHero hero = user_hero.findById(userId).get();
+        GroupSQL group = hero_groups.findById(hero.getIdGroup()).get();
+        group.excludeUser(userId);
+        hero_groups.save(group);
+        hero.setIdGroup(null);
+        user_hero.save(hero);
+        sendMessage(userId, "Лидер исключил Вас из группы!");
+        sendMessage(group.getIdLeader(), "Вы выгнали пользователя <b>@%s</b> из группы!"
+                .formatted(user_table.findById(userId).get().getUserName()));
     }
 
     private void deleteGroup(Long userId) {
@@ -725,7 +891,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 cats[ThreadLocalRandom.current().nextInt(0, 3)], list);
     }
 
-    // ИЗУЧИТЬ ТЕМУ С ЗАПРОСАМИ ЧЕРЕЗ HIBERNATE (ПОТОМУ ЧТО chat_id не является @Id)
     private void showUsers(long userId) {
         if (!user_table.findById(userId).get().isAdmin()) {
             sendMessage(userId, "Вы не обладаете правами администратора!");
