@@ -365,8 +365,51 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                 new Pair<String, String>("Назад", "/travelTo"));
                                         break;
                                     case "town":
-                                        showUnderConstruct(update.getMessage().getFrom().getId(),
-                                                new Pair<String, String>("Назад", "/travelTo"));
+                                        if (update.getMessage().getText().split(" ").length == 2) {
+                                            showTown(update.getMessage().getFrom().getId());
+                                        } else {
+                                            switch (update.getMessage().getText().split(" ")[2]) {
+                                                case "shop":
+                                                    showUnderConstruct(update.getMessage().getFrom().getId(),
+                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                    break;
+                                                case "bar":
+                                                    showUnderConstruct(update.getMessage().getFrom().getId(),
+                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                    break;
+                                                case "hospital":
+                                                    if (update.getMessage().getText().split(" ").length == 3) {
+                                                        showHospital(update.getMessage().getFrom().getId());
+                                                    } else {
+                                                        switch (update.getMessage().getText().split(" ")[3]) {
+                                                            case "1":
+                                                                hospitalHeal(update.getMessage().getFrom().getId(), 1);
+                                                                break;
+                                                            case "2":
+                                                                hospitalHeal(update.getMessage().getFrom().getId(), 3);
+                                                                break;
+                                                            case "3":
+                                                                hospitalHeal(update.getMessage().getFrom().getId(), 5);
+                                                                break;
+                                                            case "4":
+                                                                hospitalHeal(update.getMessage().getFrom().getId(), 10);
+                                                                break;
+                                                            default:
+                                                                break;
+                                                        }
+                                                    }
+                                                    break;
+                                                case "wedding":
+                                                    showUnderConstruct(update.getMessage().getFrom().getId(),
+                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                    break;
+                                                default:
+                                                    break;
+                                            }
+                                        }
+
+                                        break;
+                                    default:
                                         break;
                                 }
                             }
@@ -606,6 +649,82 @@ public class TelegramBot extends TelegramLongPollingBot {
                 new Pair<String, String>("Город" + EmojiParser.parseToUnicode(":european_castle:"), "/travelTo town"));
         list.get(2).add(new Pair<String, String>("Назад", "/hero"));
         editMenuMessage(userId, "Куда вы желаете отправиться?", list);
+    }
+
+    private void showTown(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>(
+                "Таверна" + EmojiParser.parseToUnicode(":beer:"), "/travelTo town bar"));
+        list.get(1).add(
+                new Pair<String, String>("Лавка торговца" + EmojiParser.parseToUnicode(":convenience_store:"),
+                        "/travelTo town shop"));
+        list.get(2).add(
+                new Pair<String, String>("Лавка целителя" + EmojiParser.parseToUnicode(":hospital:"),
+                        "/travelTo town hospital"));
+        list.get(3).add(
+                new Pair<String, String>("Бракосочетальная" + EmojiParser.parseToUnicode(":wedding:"),
+                        "/travelTo town wedding"));
+        list.get(4).add(new Pair<String, String>("Назад", "/travelTo"));
+        editMenuMessage(userId,
+                "Добро пожаловать! Добро пожаловать в Сити 17.\n Сами вы его выбрали, или его выбрали за вас — это лучший город из оставшихся.\n Я такого высокого мнения о Сити 17, что решил разместить свое правительство здесь, в Цитадели, столь заботливо предоставленной нашими Покровителями.\n Я горжусь тем, что называю Сити 17 своим домом.\n Итак, собираетесь ли вы остаться здесь, или же вас ждут неизвестные дали, добро пожаловать в Сити 17. Здесь безопасно.",
+                list);
+    }
+
+    private void showHospital(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>(
+                "Подорожник" + EmojiParser.parseToUnicode(":leaves:") + " 2 злотый", "/travelTo town hospital 1"));
+        list.get(0).add(new Pair<String, String>(
+                "Перевязка" + EmojiParser.parseToUnicode(":gift_heart:") + " 6 злотый", "/travelTo town hospital 2"));
+        list.get(1).add(new Pair<String, String>(
+                "Странное зелье" + EmojiParser.parseToUnicode(":coffee:") + " 10 злотый", "/travelTo town hospital 3"));
+        list.get(1).add(new Pair<String, String>(
+                "Вас излечат" + EmojiParser.parseToUnicode(":woman_health_worker:") + " 20 злотый",
+                "/travelTo town hospital 4"));
+        list.get(2).add(new Pair<String, String>("Назад", "/travelTo town"));
+        editMenuMessage(userId,
+                "Лавка целителя\n Можете выбрать способ лечения, который вам по карману",
+                list);
+    }
+
+    private void hospitalHeal(long userId, Integer health) {
+        UserHero hero = user_hero.findByUserId(userId).get();
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        String textToSend;
+        if (hero.getCurrentHealth() == hero.getMaxHealth()) {
+
+            list.get(0).add(new Pair<String, String>("Назад", "/travelTo town"));
+            textToSend = "Сейчас глянем... Так, печень, естественно, увеличена, но это профессиональное...\n В основном — здоров как бык.\n Нечего тут лечить!";
+
+        } else {
+            if (hero.getMoney() >= health * 2) {
+                textToSend = "Так ну вроде бы здоров)";
+                list.get(0).add(new Pair<String, String>("Назад", "/travelTo town hospital"));
+                hero.setCurrentHealth(health);
+                hero
+
+            } else {
+                textToSend = EmojiParser.parseToUnicode(":rage:") +" Иди отсюда бродяга, возвращайся если денег наскребешь!";
+                list.get(0).add(new Pair<String, String>("Назад", "/travelTo town"));
+            }
+
+        }
+
+        editMenuMessage(userId,
+                textToSend,
+                list);
+
     }
 
     private void showHero(long userId) {
