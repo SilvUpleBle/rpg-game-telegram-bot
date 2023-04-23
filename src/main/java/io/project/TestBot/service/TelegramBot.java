@@ -963,7 +963,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.add(new ArrayList<>());
         list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
 
-        editMenuMessage(userId, textToSend, list);
+        editMessage(userId, "Список заданий", list);
 
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/tasks");
@@ -981,7 +981,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 "/tasks"));
         editMessage(userId, "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
                 + "Награда: " + task.getPoints() + "\n" + "Дата начала: " + task.getDateStart() + "\n" + "Дата конца: "
-                + task.getDateEnd(), list, taskId);
+                + task.getDateEnd(), list);
     }
 
     private void submitTaskByUser(Long userId, Long taskId) {
