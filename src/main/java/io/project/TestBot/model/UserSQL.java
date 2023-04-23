@@ -100,6 +100,11 @@ public class UserSQL implements Comparable<UserSQL> {
         return activeTasks;
     }
 
+    public String[] getAllActiveTasksId() {
+        String[] allActiveTasksId = getActiveTasks().split(";");
+        return allActiveTasksId;
+    }
+
     public void setActiveTasks(String activeTasks) {
         this.activeTasks = activeTasks;
     }
