@@ -15,6 +15,7 @@ import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -163,10 +164,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                         createTask(update.getMessage(), (byte) user.getStep());
                         break;
                     case "/edit_task":
-                        editTask(update.getMessage(), (byte) user.getStep());
-                        break;
-                    case "/delete_task":
-                        deleteTask(update.getMessage(), (byte) user.getStep());
+                        editTask(update.getMessage(), (byte) user.getStep(),
+                                Long.valueOf(user.getLastUserMessage()));
                         break;
                     case "/delete_user":
                         deleteUser(update.getMessage(), (byte) user.getStep());
@@ -229,20 +228,27 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user_state.save(user);
                             createTask(update.getMessage(), (byte) 1);
                             break;
+                        case "/task_agree", "/task_agree@tstbtstst_bot":
+                            agreeTask(update.getMessage(), Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
                         case "/edit_task":
                             user.setProcess("/edit_task");
                             user_state.save(user);
-                            editTask(update.getMessage(), (byte) 1);
+                            editTask(update.getMessage(), (byte) 1,
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/delete_task":
-                            user.setProcess("/delete_task");
-                            user_state.save(user);
-                            deleteTask(update.getMessage(), (byte) 1);
+                            deleteTask(update.getMessage(), Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/show_creators_tasks":
-                            user.setProcess("/show_creators_tasks");
-                            user_state.save(user);
-                            showCreatorsTasks(update.getMessage());
+                            showCreatorsTasks(update.getMessage().getFrom().getId());
+                            break;
+                        case "/adminTasks", "/adminTasks@tstbtstst_bot":
+                            adminTasks(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showAdminTask":
+                            showAdminTask(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/get_rights", "/get_rights@tstbtstst_bot":
                             getAdminRights(update.getMessage());
@@ -259,6 +265,23 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/tasks", "/tasks@tstbtstst_bot":
                             showTasksList(update.getMessage().getFrom().getId());
                             break;
+                        case "/user_tasks", "/user_tasks@tstbtstst_bot":
+                            showUserTask(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/submit_task_by_user", "/submit_task_by_user@tstbtstst_bot":
+                            submitTaskByUser(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/submitTaskByAdmin", "/submitTaskByAdmin@tstbtstst_bot":
+                            submitTaskByAdmin(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/rejectTask", "/rejectTask@tstbtstst_bot":
+                            // rejectTask(update.getMessage().getFrom().getId(),
+                            // Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+
                         case "/administration", "/administration@tstbtstst_bot":
                             showAdministration(update.getMessage().getFrom().getId());
                             break;
@@ -564,11 +587,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                 "\n<b>Права администратора:</b> \t" + user.isAdmin() +
                 "\n<b>Количество Ваших очков:</b> \t" + user.getPoints() +
                 "\n<b>Количество активных задач:</b> \t"
-                + getIdsFromString(user.getActiveTasks(), ";").size(), list);
+                + (user.getActiveTasks().split(";").length - 1), list);
 
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/profile");
         user_state.save(userS);
+
     }
 
     private void showTravelTo(long userId) {
@@ -919,27 +943,66 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void showTasksList(long userId) {
         List<List<Pair<String, String>>> list = new ArrayList<>();
-        UserSQL user = user_table.findById(userId).get();
-        List<Long> tasksId = getIdsFromString(user.getActiveTasks(), ";");
-        String textToSend = "Ваши задачи:";
-        if (tasksId.isEmpty()) {
-            textToSend += "\n\nУ Вас нет активных задач!";
+
+        List<TaskSQL> taskList = new ArrayList<>();
+        if (user_table.findById(userId).get().getActiveTasks() == null) {
+
         } else {
-            for (int i = 0; i < tasksId.size(); i++) {
+            String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
+            for (int i = 1; i < taskId.length; i++) {
+                TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
+                taskList.add(task);
+            }
+            for (int i = 0; i < taskList.size(); i++) {
                 list.add(new ArrayList<>());
-                list.get(i).add(new Pair<String, String>(task_table.findById(tasksId.get(i)).get().getTaskName(),
-                        "/getTask " + tasksId.get(i)));
+                list.get(i).add(new Pair<String, String>(taskList.get(i).getTaskName(),
+                        "/user_tasks " + taskList.get(i).getTaskId()));
             }
         }
 
         list.add(new ArrayList<>());
-        list.get(tasksId.size()).add(new Pair<String, String>("Назад", "/menu"));
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
 
         editMenuMessage(userId, textToSend, list);
 
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/tasks");
         user_state.save(userS);
+    }
+
+    private void showUserTask(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Сдать задание",
+                "/submit_task_by_user " + taskId));
+        list.get(1).add(new Pair<String, String>("Назад",
+                "/tasks"));
+        editMessage(userId, "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
+                + "Награда: " + task.getPoints() + "\n" + "Дата начала: " + task.getDateStart() + "\n" + "Дата конца: "
+                + task.getDateEnd(), list, taskId);
+    }
+
+    private void submitTaskByUser(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Принять задание",
+                "//submitTaskByAdmin " + taskId));
+        list.get(1).add(new Pair<String, String>("Отказать",
+                "/rejectTask " + taskId));
+        sendMessageWithInlineButtons(task.getCreatorId(),
+                "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
+                        + " Принять задание?",
+                list);
+    }
+
+    private void submitTaskByAdmin(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<UserSQL> users;
+
     }
 
     private void showAdministration(long userId) {
@@ -1102,6 +1165,58 @@ public class TelegramBot extends TelegramLongPollingBot {
         sendMessage(userId, "Вы получили предмет <b>%s</b>!".formatted(item_table.findById(itemId).get().toString()));
     }
 
+    private void adminTasks(long userId) {
+        if (!user_table.findById(userId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Мои задачи", "/show_creators_tasks"));
+        list.get(1).add(new Pair<String, String>("Создать задачу", "/create_task"));
+        list.get(2).add(new Pair<String, String>("Назад", "/administration"));
+        editMessage(userId, "Меню администратора:", list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/administration");
+        user_state.save(userS);
+    }
+
+    private void showCreatorsTasks(Long userId) {
+
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+
+        List<TaskSQL> taskList = new ArrayList<>();
+        taskList = task_table.findAllByCreatorId(userId);
+        for (int i = 0; i < taskList.size(); i++) {
+            list.add(new ArrayList<>());
+            list.get(i).add(new Pair<String, String>(taskList.get(i).getTaskName(),
+                    "/showAdminTask " + taskList.get(i).getTaskId()));
+        }
+        list.add(new ArrayList<>());
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/adminTasks"));
+
+        editMessage(userId, "Список заданий", list);
+    }
+
+    private void showAdminTask(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Изменить задание",
+                "/edit_task " + taskId));
+        list.get(1).add(new Pair<String, String>("Удалить задание",
+                "/delete_task " + taskId));
+        list.get(2).add(new Pair<String, String>("Назад",
+                "/show_creators_tasks"));
+        editMessage(userId, "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
+                + "Награда: " + task.getPoints() + "\n" + "Дата начала: " + task.getDateStart() + "\n" + "Дата конца: "
+                + task.getDateEnd(), list);
+    }
     //
     // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
     //
@@ -1132,20 +1247,21 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void createTask(Message message, byte step) {
         UserState user = user_state.findById(message.getFrom().getId()).get();
+        UserSQL usersql = user_table.findById(message.getFrom().getId()).get();
         if (message.getChat().isUserChat()) {
             if (!user_table.findById(message.getFrom().getId()).isEmpty()) {
                 if (user_table.findById(message.getFrom().getId()).get().isAdmin()) {
-
+                    String[] desc;
                     switch (step) {
                         case 1:
                             sendMessage(message.getFrom().getId(),
-                                    message.getChat().getFirstName() + ", приступим к созданию задания");
+                                    "Давайте приступим к созданию задания");
                             log.info("Start creating task " + message.getChat().getFirstName());
                             createTask(message, (byte) 2);
                             break;
                         case 2:
                             sendMessage(message.getFrom().getId(),
-                                    "Введите название задания и через ; его описание");
+                                    "Введите название задания!");
                             user.setWaitForRequest(true);
                             user.setStep((byte) 3);
                             user_state.save(user);
@@ -1161,6 +1277,89 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case 4:
                             switch (message.getText()) {
                                 case "Да", "да":
+                                    if (task_table.existsByTaskName(user.getLastUserMessage())) {
+                                        sendMessage(message.getFrom().getId(),
+                                                "Такое название задания уже существует, введите иное название!");
+                                        createTask(message, (byte) 2);
+                                    } else {
+                                        sendMessage(message.getFrom().getId(),
+                                                "Введите описание задания!");
+                                        user.setWaitForRequest(true);
+                                        user.setStep((byte) 5);
+                                        user_state.save(user);
+                                    }
+
+                                    break;
+                                case "Нет", "нет":
+                                    createTask(message, (byte) 2);
+                                    break;
+                            }
+                            break;
+                        case 5:
+                            user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
+                            desc = user.getLastUserMessage().split(";");
+
+                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
+                                    .formatted(desc[1]), new String[][] { { "Да", "Нет" } });
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 6);
+                            user_state.save(user);
+                            break;
+                        case 6:
+                            sendMessage(message.getFrom().getId(),
+                                    "Введите награду за задание!");
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 7);
+                            user_state.save(user);
+                            break;
+                        case 7:
+                            user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
+                            desc = user.getLastUserMessage().split(";");
+
+                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
+                                    .formatted(desc[2]), new String[][] { { "Да", "Нет" } });
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 8);
+                            user_state.save(user);
+                            break;
+                        case 8:
+                            sendMessage(message.getFrom().getId(),
+                                    "Введите колличество человек для этого задания!");
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 9);
+                            user_state.save(user);
+                            break;
+                        case 9:
+                            user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
+                            desc = user.getLastUserMessage().split(";");
+
+                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
+                                    .formatted(desc[3]), new String[][] { { "Да", "Нет" } });
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 10);
+                            user_state.save(user);
+                            break;
+                        case 10:
+                            sendMessage(message.getFrom().getId(),
+                                    "Введите дату окончания задания в форме год-месяц-день");
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 11);
+                            user_state.save(user);
+                            break;
+                        case 11:
+                            user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
+                            desc = user.getLastUserMessage().split(";");
+
+                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
+                                    .formatted(desc[4]), new String[][] { { "Да", "Нет" } });
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 12);
+                            user_state.save(user);
+                            break;
+                        case 12:
+                            switch (message.getText()) {
+                                case "Да", "да":
+                                    LocalDate ldt = LocalDate.now();
                                     TaskSQL task = new TaskSQL();
                                     String[] arr = user.getLastUserMessage().split(";");
 
@@ -1171,21 +1370,32 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                                     task.setTaskId(randomInt);
                                     task.setCreatorId(message.getFrom().getId());
-                                    task.setTaskDescription(user.getLastUserMessage().substring(arr[0].length() + 1));
+                                    task.setTaskDescription(arr[1]);
                                     task.setTaskName(arr[0]);
-                                    task.setTaskType("real life task");
+                                    task.setPoints(Integer.parseInt(arr[2]));
+                                    task.setDateStart(ldt.toString());
+                                    task.setDateEnd(arr[4]);
+                                    task.setCapacity(Integer.parseInt(arr[3]));
                                     task_table.save(task);
 
                                     user.setProcess(null);
                                     user_state.save(user);
                                     sendMessage(message.getFrom().getId(), "Создание окончено!");
+                                    sendMessage(message.getFrom().getId(), "Создание окончено!");
                                     List<List<Pair<String, String>>> list = new ArrayList<>();
                                     list.add(new ArrayList<>());
-                                    list.get(0).add(new Pair<String, String>("Принять", "/task_agree"));
-                                    // acceptTask(task.getTaskId(), message.getFrom().getId(), list);// придумать
-                                    // как
-                                    // кидать в группу
+                                    list.get(0).add(
+                                            new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
 
+                                    adminTasks(message.getFrom().getId());
+                                    sendMessageWithLastMessageId(usersql.getChatId(),
+                                            "Задание: " + task.getTaskName() + "\n" + "Описание: "
+                                                    + task.getTaskDescription() + "\n"
+                                                    + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
+                                                    + task.getDateStart() + "\n" + "Дата конца: "
+                                                    + task.getDateEnd() + "\n" + "Колличество людей взявших задание: 0/"
+                                                    + task.getCapacity(),
+                                            task.getTaskId(), list);
                                     break;
                                 case "Нет", "нет":
                                     createTask(message, (byte) 2);
@@ -1208,69 +1418,96 @@ public class TelegramBot extends TelegramLongPollingBot {
                 user_state.save(user);
                 sendMessage(message.getFrom().getId(), "Вы не зарегистрированны");
             }
-        } else {
+        } else
+
+        {
             sendMessage(message.getChatId(), "Используйте эту команду в личных сообщениях с ботом!");
             user.setProcess(null);
             user_state.save(user);
         }
     }
 
-    private void editTask(Message message, byte step) {
+    private void agreeTask(Message message, Long taskId) {
+
+        TaskSQL task = task_table.findByTaskId(taskId);
+        UserSQL user = user_table.findById(message.getFrom().getId()).get();
+        String[] arr;
+        if (task.getRecipientId() == null) {
+            task.addRecipientId(String.valueOf(message.getFrom().getId()));
+            user.addActiveTasks(String.valueOf(taskId));
+            user_table.save(user);
+            task_table.save(task);
+            arr = task.getRecipientId().split(";");
+
+            List<List<Pair<String, String>>> list = new ArrayList<>();
+            list.add(new ArrayList<>());
+            list.get(0).add(
+                    new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
+            editMessage(message.getChatId(), "Задание: " + task.getTaskName() + "\n" + "Описание: "
+                    + task.getTaskDescription() + "\n"
+                    + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
+                    + task.getDateStart() + "\n" + "Дата конца: "
+                    + task.getDateEnd() + "\n" + "Колличество людей взявших задание: " + arr.length + "/"
+                    + task.getCapacity(), list, taskId);
+
+            sendMessage(user.getUserId(), "Вы взяли задание: " + task.getTaskName());
+        } else {
+            arr = task.getRecipientId().split(";");
+            boolean fl = false;
+            for (int i = 0; i < arr.length; i++) {
+                if (arr[i].equals(String.valueOf(message.getFrom().getId()))) {
+                    fl = true;
+                    break;
+                }
+            }
+            if (!fl) {
+                task.addRecipientId(String.valueOf(message.getFrom().getId()));
+                user.addActiveTasks(String.valueOf(taskId));
+                user_table.save(user);
+                task_table.save(task);
+                List<List<Pair<String, String>>> list = new ArrayList<>();
+                list.add(new ArrayList<>());
+                list.get(0).add(
+                        new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
+                if (arr.length == task.getCapacity() - 1) {
+                    editMessage(message.getChatId(), "Задание: " + task.getTaskName() + " полностью разобрано!",
+                            taskId);
+                } else {
+
+                    editMessage(message.getChatId(), "Задание: " + task.getTaskName() + "\n" + "Описание: "
+                            + task.getTaskDescription() + "\n"
+                            + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
+                            + task.getDateStart() + "\n" + "Дата конца: "
+                            + task.getDateEnd() + "\n" + "Колличество людей взявших задание: " + arr.length + "/"
+                            + task.getCapacity(), list, taskId);
+                }
+                sendMessage(user.getUserId(), "Вы взяли задание: " + task.getTaskName());
+            } else {
+                sendMessage(user.getUserId(), "Вы уже брали задание: " + task.getTaskName());
+            }
+
+        }
+
+    }
+
+    private void editTask(Message message, byte step, Long taskId) {
         UserState user = user_state.findById(message.getFrom().getId()).get();
         if (message.getChat().isUserChat()) {
             if (!user_table.findById(message.getFrom().getId()).isEmpty()) {
                 if (user_table.findById(message.getFrom().getId()).get().isAdmin()) {
                     TaskSQL task;
+                    user.setLastUserMessage(String.valueOf(taskId));
                     switch (step) {
                         case 1:
-                            sendMessage(message.getFrom().getId(),
-                                    "Присутупим к изменению задания!");
+                            task = task_table.findByTaskId(taskId);
+                            sendMessage(message.getChatId(), "Напишите что вы хотите изменить",
+                                    new String[][] { { "Название", "Описание", "Награда" } });
+                            user.setWaitForRequest(true);
+                            user.setStep((byte) 2);
+                            user_state.save(user);
 
-                            editTask(message, (byte) 2);
                             break;
                         case 2:
-                            sendMessage(message.getFrom().getId(),
-                                    "Введите название задания которое хотите изменить");
-                            user.setWaitForRequest(true);
-                            user.setStep((byte) 3);
-                            user_state.save(user);
-                            break;
-                        case 3:
-                            user.setLastUserMessage(message.getText());
-                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
-                                    .formatted(user.getLastUserMessage()), new String[][] { { "Да", "Нет" } });
-                            user.setWaitForRequest(true);
-                            user.setStep((byte) 4);
-                            user_state.save(user);
-                            break;
-                        case 4:
-                            switch (message.getText()) {
-                                case "Да", "да":
-                                    if (task_table.existsByTaskName(user.getLastUserMessage())) {
-                                        task = task_table.findByTaskName(user.getLastUserMessage());
-                                        sendMessage(message.getChatId(), "Напишите что вы хотите изменить",
-                                                new String[][] { { "Название", "Описание", "Награда" } });
-                                        user.setWaitForRequest(true);
-                                        user.setStep((byte) 5);
-                                        user_state.save(user);
-                                    } else {
-                                        sendMessage(message.getChatId(),
-                                                "Введено неверное название, такого названия не существует!");
-                                        editTask(message, (byte) 2);
-                                        user.setStep((byte) 2);
-                                        user_state.save(user);
-                                    }
-
-                                    break;
-                                case "Нет", "нет":
-                                    editTask(message, (byte) 2);
-                                    user.setStep((byte) 2);
-                                    user_state.save(user);
-                                    break;
-                                default:
-                                    break;
-                            }
-                        case 5:
                             switch (message.getText()) {
                                 case "Название", "название":
                                     sendMessage(message.getChatId(), "Введите новое название");
@@ -1296,28 +1533,31 @@ public class TelegramBot extends TelegramLongPollingBot {
                             break;
                         //////////// Добавить уведомление о изменении задания в группу
                         case 51:
-                            task = task_table.findByTaskName(user.getLastUserMessage());
+                            task = task_table.findByTaskId(taskId);
                             task.setTaskName(message.getText());
                             task_table.save(task);
                             user.setProcess(null);
                             user_state.save(user);
                             sendMessage(message.getChatId(), "Изменение завершено!");
+                            adminTasks(message.getFrom().getId());
                             break;
                         case 52:
-                            task = task_table.findByTaskName(user.getLastUserMessage());
+                            task = task_table.findByTaskId(taskId);
                             task.setTaskDescription(message.getText());
                             task_table.save(task);
                             user.setProcess(null);
                             user_state.save(user);
                             sendMessage(message.getChatId(), "Изменение завершено!");
+                            adminTasks(message.getFrom().getId());
                             break;
                         case 53:
-                            task = task_table.findByTaskName(user.getLastUserMessage());
+                            task = task_table.findByTaskId(taskId);
                             task.setPoints(Integer.parseInt(message.getText()));
                             task_table.save(task);
                             user.setProcess(null);
                             user_state.save(user);
                             sendMessage(message.getChatId(), "Изменение завершено!");
+                            adminTasks(message.getFrom().getId());
                             break;
 
                         default:
@@ -1341,89 +1581,25 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void deleteTask(Message message, byte step) {
-        UserState user = user_state.findById(message.getFrom().getId()).get();
+    private void deleteTask(Message message, Long taskId) {
         if (message.getChat().isUserChat()) {
             if (!user_table.findById(message.getFrom().getId()).isEmpty()) {
                 if (user_table.findById(message.getFrom().getId()).get().isAdmin()) {
                     TaskSQL task;
-                    switch (step) {
-                        case 1:
-                            sendMessage(message.getFrom().getId(),
-                                    "Присутупим к удалению задания!");
 
-                            deleteTask(message, (byte) 2);
-                            break;
-                        case 2:
-                            sendMessage(message.getFrom().getId(),
-                                    "Введите название задания которое хотите удалить");
-                            user.setWaitForRequest(true);
-                            user.setStep((byte) 3);
-                            user_state.save(user);
-                            break;
-                        case 3:
-                            user.setLastUserMessage(message.getText());
-                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
-                                    .formatted(user.getLastUserMessage()), new String[][] { { "Да", "Нет" } });
-                            user.setWaitForRequest(true);
-                            user.setStep((byte) 4);
-                            user_state.save(user);
-                            break;
-                        case 4:
-                            switch (message.getText()) {
-                                case "Да", "да":
-                                    if (task_table.existsByTaskName(user.getLastUserMessage())) {
-                                        task = task_table.findByTaskName(user.getLastUserMessage());
-                                        task_table.delete(task);
-                                        user.setProcess(null);
-                                        user_state.save(user);
-                                        sendMessage(message.getChatId(), "Удаление завершено!");
-                                    } else {
-                                        sendMessage(message.getChatId(),
-                                                "Ошибка в названии, такого задания не существует!");
-                                        deleteTask(message, (byte) 2);
-                                        user.setStep((byte) 2);
-                                        user_state.save(user);
-                                    }
-
-                                    break;
-                                case "Нет", "нет":
-                                    deleteTask(message, (byte) 2);
-                                    user.setStep((byte) 2);
-                                    user_state.save(user);
-                                    break;
-                                default:
-                                    break;
-                            }
-                            break;
-                        default:
-                            break;
-                    }
+                    task = task_table.findByTaskId(taskId);
+                    task_table.delete(task);
+                    editMessage(message.getChatId(), "Удаление завершено!");
+                    adminTasks(message.getFrom().getId());
 
                 } else {
                     sendMessage(message.getChatId(), "Вы не администратор");
-                    user.setProcess(null);
-                    user_state.save(user);
                 }
             } else {
-                user.setProcess(null);
-                user_state.save(user);
                 sendMessage(message.getFrom().getId(), "Вы не зарегистрированны");
             }
         } else {
             sendMessage(message.getChatId(), "Используйте эту команду в личных сообщениях с ботом!");
-            user.setProcess(null);
-            user_state.save(user);
-        }
-    }
-
-    private void showCreatorsTasks(Message message) {
-        List<TaskSQL> taskList = new ArrayList<>();
-        taskList = task_table.findAllByCreatorId(message.getFrom().getId());
-        for (int i = 0; i < taskList.size(); i++) {
-            sendMessage(message.getChatId(), i + 1 + ". " + taskList.get(i).getTaskName());
-            sendMessage(message.getChatId(), "Описание " + taskList.get(i).getTaskDescription());
-            sendMessage(message.getChatId(), "--------------------------------------");
         }
     }
 
@@ -1515,7 +1691,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         try {
             Message msg = execute(message);
-
             if (!user_state.findById(chatId).isEmpty()) {
                 UserState user = user_state.findById(chatId).get();
                 user.setIdLastBotMessage(msg.getMessageId());
@@ -1565,7 +1740,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMenuMessage(chatId, newMessage, buttons);
         }
     }
-
     private void editMessage(long chatId, String newMessage) {
         EditMessageText editMessageText = new EditMessageText();
         editMessageText.setChatId(String.valueOf(chatId));
@@ -1575,6 +1749,37 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         try {
             execute(editMessageText);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void editMessage(long chatId, String newMessage, List<List<Pair<String, String>>> buttons, Long taskId) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(task_table.findById(taskId).get().getMessageId());
+        editMessageText.setText(newMessage);
+        editMessageText.setReplyMarkup(createInlineKeyboard(buttons));
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void editMessage(long chatId, String newMessage, Long taskId) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(task_table.findById(taskId).get().getMessageId());
+        editMessageText.setText(newMessage);
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
@@ -1590,17 +1795,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         try {
             execute(editMessageText);
-        } catch (TelegramApiException e) {
-            log.error("Error occurred: " + e.getMessage());
-        }
-    }
-
-    private void deleteLastMessage(long chatId) {
-        DeleteMessage deleteMessage = new DeleteMessage(String.valueOf(chatId),
-                user_state.findById(chatId).get().getIdLastBotMessage());
-
-        try {
-            execute(deleteMessage);
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
         }
