@@ -253,6 +253,23 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/tasks", "/tasks@tstbtstst_bot":
                             showTasksList(update.getMessage().getFrom().getId());
                             break;
+                        case "/user_tasks", "/user_tasks@tstbtstst_bot":
+                            showUserTask(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/submit_task_by_user", "/submit_task_by_user@tstbtstst_bot":
+                            submitTaskByUser(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/submitTaskByAdmin", "/submitTaskByAdmin@tstbtstst_bot":
+                            submitTaskByAdmin(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/rejectTask", "/rejectTask@tstbtstst_bot":
+                            // rejectTask(update.getMessage().getFrom().getId(),
+                            // Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+
                         case "/administration", "/administration@tstbtstst_bot":
                             showAdministration(update.getMessage().getFrom().getId());
                             break;
@@ -502,11 +519,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                 "\n<b>Права администратора:</b> \t" + user.isAdmin() +
                 "\n<b>Количество Ваших очков:</b> \t" + user.getPoints() +
                 "\n<b>Количество активных задач:</b> \t"
-                + getIdsFromString(user.getActiveTasks(), ";").size(), list);
+                + (user.getActiveTasks().split(";").length - 1), list);
 
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/profile");
         user_state.save(userS);
+
     }
 
     private void showHero(long userId) {
@@ -645,27 +663,66 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void showTasksList(long userId) {
         List<List<Pair<String, String>>> list = new ArrayList<>();
-        UserSQL user = user_table.findById(userId).get();
-        List<Long> tasksId = getIdsFromString(user.getActiveTasks(), ";");
-        String textToSend = "Ваши задачи:";
-        if (tasksId.isEmpty()) {
-            textToSend += "\n\nУ Вас нет активных задач!";
+
+        List<TaskSQL> taskList = new ArrayList<>();
+        if (user_table.findById(userId).get().getActiveTasks() == null) {
+
         } else {
-            for (int i = 0; i < tasksId.size(); i++) {
+            String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
+            for (int i = 1; i < taskId.length; i++) {
+                TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
+                taskList.add(task);
+            }
+            for (int i = 0; i < taskList.size(); i++) {
                 list.add(new ArrayList<>());
-                list.get(i).add(new Pair<String, String>(task_table.findById(tasksId.get(i)).get().getTaskName(),
-                        "/getTask " + tasksId.get(i)));
+                list.get(i).add(new Pair<String, String>(taskList.get(i).getTaskName(),
+                        "/user_tasks " + taskList.get(i).getTaskId()));
             }
         }
 
         list.add(new ArrayList<>());
-        list.get(tasksId.size()).add(new Pair<String, String>("Назад", "/menu"));
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
 
-        editMessage(userId, textToSend, list);
+        editMessage(userId, "Список заданий", list);
 
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/tasks");
         user_state.save(userS);
+    }
+
+    private void showUserTask(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Сдать задание",
+                "/submit_task_by_user " + taskId));
+        list.get(1).add(new Pair<String, String>("Назад",
+                "/tasks"));
+        editMessage(userId, "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
+                + "Награда: " + task.getPoints() + "\n" + "Дата начала: " + task.getDateStart() + "\n" + "Дата конца: "
+                + task.getDateEnd(), list, taskId);
+    }
+
+    private void submitTaskByUser(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Принять задание",
+                "//submitTaskByAdmin " + taskId));
+        list.get(1).add(new Pair<String, String>("Отказать",
+                "/rejectTask " + taskId));
+        sendMessageWithInlineButtons(task.getCreatorId(),
+                "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
+                        + " Принять задание?",
+                list);
+    }
+
+    private void submitTaskByAdmin(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<UserSQL> users;
+
     }
 
     private void showAdministration(long userId) {
@@ -1099,24 +1156,62 @@ public class TelegramBot extends TelegramLongPollingBot {
         TaskSQL task = task_table.findByTaskId(taskId);
         UserSQL user = user_table.findById(message.getFrom().getId()).get();
         String[] arr;
-        task.addRecipientId(String.valueOf(message.getFrom().getId()));
-        user.addActiveTasks(String.valueOf(taskId));
-        user_table.save(user);
-        task_table.save(task);
-        arr = task.getRecipientId().split(";");
+        if (task.getRecipientId() == null) {
+            task.addRecipientId(String.valueOf(message.getFrom().getId()));
+            user.addActiveTasks(String.valueOf(taskId));
+            user_table.save(user);
+            task_table.save(task);
+            arr = task.getRecipientId().split(";");
 
-        List<List<Pair<String, String>>> list = new ArrayList<>();
-        list.add(new ArrayList<>());
-        list.get(0).add(
-                new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
-        editMessage(message.getChatId(), "Задание: " + task.getTaskName() + "\n" + "Описание: "
-                + task.getTaskDescription() + "\n"
-                + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
-                + task.getDateStart() + "\n" + "Дата конца: "
-                + task.getDateEnd() + "\n" + "Колличество людей взявших задание: " + arr.length + "/"
-                + task.getCapacity(), list, taskId);
+            List<List<Pair<String, String>>> list = new ArrayList<>();
+            list.add(new ArrayList<>());
+            list.get(0).add(
+                    new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
+            editMessage(message.getChatId(), "Задание: " + task.getTaskName() + "\n" + "Описание: "
+                    + task.getTaskDescription() + "\n"
+                    + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
+                    + task.getDateStart() + "\n" + "Дата конца: "
+                    + task.getDateEnd() + "\n" + "Колличество людей взявших задание: " + arr.length + "/"
+                    + task.getCapacity(), list, taskId);
 
-        sendMessage(user.getUserId(), "Вы взяли задание: " + task.getTaskName());
+            sendMessage(user.getUserId(), "Вы взяли задание: " + task.getTaskName());
+        } else {
+            arr = task.getRecipientId().split(";");
+            boolean fl = false;
+            for (int i = 0; i < arr.length; i++) {
+                if (arr[i].equals(String.valueOf(message.getFrom().getId()))) {
+                    fl = true;
+                    break;
+                }
+            }
+            if (!fl) {
+                task.addRecipientId(String.valueOf(message.getFrom().getId()));
+                user.addActiveTasks(String.valueOf(taskId));
+                user_table.save(user);
+                task_table.save(task);
+                List<List<Pair<String, String>>> list = new ArrayList<>();
+                list.add(new ArrayList<>());
+                list.get(0).add(
+                        new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
+                if (arr.length == task.getCapacity() - 1) {
+                    editMessage(message.getChatId(), "Задание: " + task.getTaskName() + " полностью разобрано!",
+                            taskId);
+                } else {
+
+                    editMessage(message.getChatId(), "Задание: " + task.getTaskName() + "\n" + "Описание: "
+                            + task.getTaskDescription() + "\n"
+                            + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
+                            + task.getDateStart() + "\n" + "Дата конца: "
+                            + task.getDateEnd() + "\n" + "Колличество людей взявших задание: " + arr.length + "/"
+                            + task.getCapacity(), list, taskId);
+                }
+                sendMessage(user.getUserId(), "Вы взяли задание: " + task.getTaskName());
+            } else {
+                sendMessage(user.getUserId(), "Вы уже брали задание: " + task.getTaskName());
+            }
+
+        }
+
     }
 
     private void editTask(Message message, byte step, Long taskId) {

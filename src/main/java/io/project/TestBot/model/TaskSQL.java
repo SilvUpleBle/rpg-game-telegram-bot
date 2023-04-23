@@ -56,6 +56,11 @@ public class TaskSQL {
         return recipientId;
     }
 
+    public String[] getAllRecipientId() {
+        String[] allRecipientId = getRecipientId().split(";");
+        return allRecipientId;
+    }
+
     public void setRecipientId(String recipientId) {
         this.recipientId = recipientId;
     }
