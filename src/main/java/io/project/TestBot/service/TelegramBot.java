@@ -10,6 +10,7 @@ import io.project.TestBot.model.GroupSQL;
 import io.project.TestBot.model.Hero_groups;
 import io.project.TestBot.model.ItemSQL;
 import io.project.TestBot.model.Item_table;
+import io.project.TestBot.model.ShopSQL;
 import io.project.TestBot.model.Shop_table;
 import io.project.TestBot.model.TaskSQL;
 import io.project.TestBot.model.Task_table;
@@ -740,7 +741,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void shopGenerator() {
-        
+        // ShopSQL shop = shop_table
+        ShopSQL shop = new ShopSQL();
+        Long random = ThreadLocalRandom.current().nextLong(0, 10000);
+        shopId = random;
+        shop.setShopId(random);
     }
 
     private void showHospital(long userId) {
