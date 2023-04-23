@@ -10,6 +10,7 @@ import io.project.TestBot.model.GroupSQL;
 import io.project.TestBot.model.Hero_groups;
 import io.project.TestBot.model.ItemSQL;
 import io.project.TestBot.model.Item_table;
+import io.project.TestBot.model.Shop_table;
 import io.project.TestBot.model.TaskSQL;
 import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
@@ -69,6 +70,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     private Task_table task_table;
     @Autowired
     private Hero_groups hero_groups;
+    @Autowired
+    private Shop_table shop_table;
 
     final BotConfig config;
 
@@ -79,6 +82,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             "https://sun9-62.userapi.com/impg/VE9gMyTK8T9I3MMPlXr-5czLv4Oxwhh3ky-k_g/K-NrldqmyA0.jpg?size=1280x1225&quality=96&sign=0ddb8766cbd12ac72a75a3cccb4d5252&type=album" };
 
     static final String HELP_TEXT = "help text";
+    Long shopId;
 
     public TelegramBot(BotConfig config) {
         this.config = config;
@@ -370,8 +374,35 @@ public class TelegramBot extends TelegramLongPollingBot {
                                         } else {
                                             switch (update.getMessage().getText().split(" ")[2]) {
                                                 case "shop":
-                                                    showUnderConstruct(update.getMessage().getFrom().getId(),
-                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                    if (update.getMessage().getText().split(" ").length == 3) {
+                                                        showShop(update.getMessage().getFrom().getId());
+                                                    } else {
+                                                        switch (update.getMessage().getText().split(" ")[3]) {
+                                                            case "weapon":
+                                                                //
+                                                                break;
+                                                            case "head":
+                                                                //
+                                                                break;
+                                                            case "chest":
+                                                                //
+                                                                break;
+                                                            case "legs":
+                                                                //
+                                                                break;
+                                                            case "foots":
+                                                                //
+                                                                break;
+                                                            case "talisman":
+                                                                //
+                                                                break;
+                                                            case "heal":
+                                                                //
+                                                                break;
+                                                            default:
+                                                                break;
+                                                        }
+                                                    }
                                                     break;
                                                 case "bar":
                                                     showUnderConstruct(update.getMessage().getFrom().getId(),
@@ -675,6 +706,39 @@ public class TelegramBot extends TelegramLongPollingBot {
                 list);
     }
 
+    private void showShop(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        UserHero hero = user_hero.findByUserId(userId).get();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+
+        list.get(0).add(new Pair<String, String>(
+                "Оружие" + EmojiParser.parseToUnicode(":archery:"), "/travelTo town shop weapon"));
+        list.get(1).add(new Pair<String, String>(
+                "Берюльки" + EmojiParser.parseToUnicode(":ring:"), "/travelTo town shop talisman"));
+        list.get(2).add(new Pair<String, String>(
+                "Защита головы" + EmojiParser.parseToUnicode(":womans_hat:"), "/travelTo town shop head"));
+        list.get(2).add(new Pair<String, String>(
+                "Защита торса" + EmojiParser.parseToUnicode("🥋"),
+                "/travelTo town shop chest"));
+        list.get(3).add(new Pair<String, String>(
+                "Защита ног" + EmojiParser.parseToUnicode(":jeans:"), "/travelTo town shop legs"));
+        list.get(3).add(new Pair<String, String>(
+                "Ботинки" + EmojiParser.parseToUnicode("🛼"), "/travelTo town shop foots"));
+        list.get(4).add(new Pair<String, String>(
+                "Исцеление" + EmojiParser.parseToUnicode(":pill:"), "/travelTo town shop heal"));
+
+        list.get(5).add(new Pair<String, String>("Назад", "/travelTo town shop"));
+        editMenuMessage(userId,
+                "Лавка всячестей \n Тут можно купить, все нужное для выживания \n Кошелек: " + hero.getMoney()
+                        + " злотых",
+                list);
+    }
+
     private void showHospital(long userId) {
         UserHero hero = user_hero.findByUserId(userId).get();
         List<List<Pair<String, String>>> list = new ArrayList<>();
@@ -695,8 +759,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.get(2).add(new Pair<String, String>("Назад", "/travelTo town"));
         editMenuMessage(userId,
                 "Лавка целителя\n Можете выбрать способ лечения, который вам по карману\n Ваше здоровье: "
-                        + hero.getCurrentHealth() + "/" + hero.getMaxHealth() + "\n Кошелек: " + hero.getMoney(),
+                        + hero.getCurrentHealth() + "/" + hero.getMaxHealth() + "\n Кошелек: " + hero.getMoney()
+                        + " злотых",
                 list);
+    }
+
+    private void shopGenerator() {
+
     }
 
     private void hospitalHeal(long userId, Integer health) {
