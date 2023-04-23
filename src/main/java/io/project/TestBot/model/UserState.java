@@ -19,6 +19,8 @@ public class UserState {
 
     private int idLastBotMessage;
 
+    private int idMenuMessage;
+
     public long getUserId() {
         return userId;
     }
@@ -69,6 +71,14 @@ public class UserState {
 
     public void setIdLastBotMessage(int idLastBotMessage) {
         this.idLastBotMessage = idLastBotMessage;
+    }
+
+    public int getIdMenuMessage() {
+        return idMenuMessage;
+    }
+
+    public void setIdMenuMessage(int idMenuMessage) {
+        this.idMenuMessage = idMenuMessage;
     }
 
 }

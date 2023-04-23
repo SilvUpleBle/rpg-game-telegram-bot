@@ -5,11 +5,14 @@ import java.util.Arrays;
 import java.util.List;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 
 @Entity(name = "hero_groups")
 public class GroupSQL {
+
     @Id
+    @GeneratedValue
     private Long idGroup;
 
     private String groupName;
@@ -61,17 +64,6 @@ public class GroupSQL {
             idUsers += ";" + users.get(i);
         }
     }
-
-    /*
-     * public String showUsers() {
-     * List<String> users = Arrays.asList(idUsers.split(";"));
-     * String textToSend = users.get(0) + EmojiParser.parseToUnicode(":crown:");
-     * for (int i = 1; i < users.size(); i++) {
-     * textToSend += ";" + users.get(i);
-     * }
-     * return textToSend;
-     * }
-     */
 
     public String getDestination() {
         return destination;
