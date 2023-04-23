@@ -1,7 +1,5 @@
 package io.project.TestBot.model;
 
-import com.vdurmont.emoji.EmojiParser;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 
@@ -67,27 +65,27 @@ public class ItemSQL {
     }
 
     public String toStringWithType() {
-        return EmojiParser.parseToUnicode(typeToEmoji()) + " " + itemName + " lv." + itemLevel;
+        return typeToEmoji() + " " + itemName + " lv." + itemLevel;
     }
 
     private String typeToEmoji() {
         switch (itemType) {
             case "weapon":
-                return ":dagger_knife:";
+                return "🗡";
             case "head":
-                return ":tophat:";
+                return "🎩";
             case "chest":
-                return ":shirt:";
+                return "👕";
             case "legs":
-                return ":jeans:";
+                return "👖";
             case "foots":
-                return ":mans_shoe:";
+                return "👞";
             case "talisman":
-                return ":ring:";
+                return "💍";
             case "heal":
-                return ":pill:";
+                return "💊";
             case "loot":
-                return ":moneybag:";
+                return "💰";
             default:
                 return "";
         }

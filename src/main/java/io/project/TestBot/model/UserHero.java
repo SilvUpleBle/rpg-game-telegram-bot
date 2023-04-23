@@ -62,24 +62,20 @@ public class UserHero {
     }
 
     public void addToInventory(Long itemId) {
-        if (inventory.equals("")) {
-            inventory = String.valueOf(itemId);
-        } else {
-            inventory += ";" + itemId;
+        List<String> list = new ArrayList<>(Arrays.asList(inventory.split(";")));
+        list.add(String.valueOf(itemId));
+        inventory = "";
+        inventory += list.get(0);
+        for (int i = 1; i < list.size(); i++) {
+            inventory += ";" + list.get(i);
         }
     }
 
     public void takeFromInventory(Long itemId) {
         List<String> list = new ArrayList<>(Arrays.asList(inventory.split(";")));
+        list.remove(String.valueOf(itemId));
         inventory = "";
-        if (list.size() > 1) {
-            for (int i = 0; i < list.size(); i++) {
-                if (list.get(i).equals(String.valueOf(itemId))) {
-                    list.remove(i);
-                    break;
-                }
-            }
-
+        if (!list.isEmpty()) {
             inventory += list.get(0);
             for (int i = 1; i < list.size(); i++) {
                 inventory += ";" + list.get(i);
