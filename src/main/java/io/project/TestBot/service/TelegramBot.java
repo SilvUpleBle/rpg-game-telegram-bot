@@ -6,6 +6,8 @@ import io.project.TestBot.model.UserSQL;
 import io.project.TestBot.model.UserState;
 import io.project.TestBot.model.User_hero;
 import io.project.TestBot.model.User_state;
+import io.project.TestBot.model.BattleSQL;
+import io.project.TestBot.model.Battle_table;
 import io.project.TestBot.model.GroupSQL;
 import io.project.TestBot.model.Hero_groups;
 import io.project.TestBot.model.ItemSQL;
@@ -72,6 +74,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     private Hero_groups hero_groups;
     @Autowired
     private Skill_table skill_table;
+    @Autowired
+    private Battle_table battle_table;
 
     final BotConfig config;
 
@@ -215,13 +219,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user_state.save(user);
                             deleteHero(update.getMessage(), (byte) 1);
                             break;
-                        case "/timer", "/timer@tstbtstst_bot": // ПЕРЕДЕЛАТЬ
-                            user.setProcess("/timer"); // ПЕРЕДЕЛАТЬ
-                            user_state.save(user); // ПЕРЕДЕЛАТЬ
-                            makeTimer(chatId, 15); // ПЕРЕДЕЛАТЬ
-                            user.setProcess(null); // ПЕРЕДЕЛАТЬ
-                            user_state.save(user); // ПЕРЕДЕЛАТЬ
-                            break; // ПЕРЕДЕЛАТЬ
+                        // TODO переделать таймер в асинхрон
+                        case "/timer", "/timer@tstbtstst_bot":
+                            user.setProcess("/timer");
+                            user_state.save(user);
+                            makeTimer(chatId, 15);
+                            user.setProcess(null);
+                            user_state.save(user);
+                            break;
                         case "/cancel", "/cancel@tstbtstst_bot":
                             cancelWithText(update.getMessage().getFrom().getId());
                             break;
@@ -381,6 +386,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                             SkillSQL skilll = skill_table.findById(Long.valueOf(1)).get();
                             sendMessage(update.getMessage().getFrom().getId(), skilll.getSkillPhrases()[0]);
                             sendMessage(update.getMessage().getFrom().getId(), skilll.getSkillPhrases()[1]);
+                            break;
+                        case "/createUserBattle", "/createUserBattle@tstbtstst_bot":
+                            createUserBattle(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/createItems":
                             List<ItemSQL> list = new ArrayList<>();
@@ -546,6 +555,31 @@ public class TelegramBot extends TelegramLongPollingBot {
     // КОНЕЦ БЛОКА СОЗДАНИЯ ПЕРСОНАЖА
     //
 
+    private void createUserBattle(Long userId, Long enemyUserId) {
+        battle_table.save(new BattleSQL("user", new Long[] { userId }, new Long[] { enemyUserId }));
+        sendMenuMessage(userId,
+                "Битва с <b>%s (@%s)</b> началась!".formatted(user_hero.findById(enemyUserId).get().getHeroName(),
+                        user_table.findById(enemyUserId).get().getUserName()));
+        sendMenuMessage(enemyUserId,
+                "Битва с <b>%s</b> началась!".formatted(user_hero.findById(userId).get().getHeroName(),
+                        user_table.findById(userId).get().getUserName()));
+        UserState user = user_state.findById(userId).get();
+        user.setProcess("/battle");
+        UserState enemy = user_state.findById(enemyUserId).get();
+        enemy.setProcess("/battle");
+        enemy.setWaitForRequest(true);
+        user_state.save(user);
+        user_state.save(enemy);
+        showBattleMessage(userId);
+        showBattleMessage(enemyUserId);
+    }
+
+    // TODO прописать метод, который позволит брать battleSQL из таблицы,
+    // TODO сделать его универсальным (и для арены, и для подземелья)
+    private void showBattleMessage(Long userId) {
+
+    }
+
     private void showMenu(long userId) {
         List<List<Pair<String, String>>> list = new ArrayList<>();
         list.add(new ArrayList<>());
@@ -640,6 +674,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         user_state.save(user);
     }
 
+    // TODO сделать!!
     private void showHeroSkills(Long userId) {
 
     }
@@ -775,7 +810,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void сhangeEquipmentTo(Long userId, int typeItem, Long itemId) {
         UserHero hero = user_hero.findById(userId).get();
         hero.takeFromInventory(itemId);
-        String[] equipmentId = hero.getEquipment();
         hero.changeEquipment(typeItem, itemId);
         user_hero.save(hero);
     }
@@ -1087,7 +1121,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.add(new ArrayList<>());
         list.get(0).add(pair);
         sendMessageWithPicture(userId, "Этот раздел пока ещё в разработке!",
-                cats[ThreadLocalRandom.current().nextInt(0, 3)], list);
+                cats[ThreadLocalRandom.current().nextInt(0, 4)], list);
     }
 
     private void showUsers(long userId) {
@@ -1861,7 +1895,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     //
     // ТАЙМЕР
     //
-
+    // TODO переделать таймер в асинхрон
     private void makeTimer(long chatId, int seconds) {
         int secondsLeft = 0;
         String newMessage = "[  " + "<b>.</b> ".repeat(seconds) + " ]";
