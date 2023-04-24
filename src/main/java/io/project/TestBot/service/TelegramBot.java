@@ -19,6 +19,7 @@ import io.project.TestBot.model.User_table;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -376,34 +377,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                                             switch (update.getMessage().getText().split(" ")[2]) {
                                                 case "shop":
                                                     if (update.getMessage().getText().split(" ").length == 3) {
+                                                        shopGenerator();
                                                         showShop(update.getMessage().getFrom().getId());
-                                                    } else {
-                                                        switch (update.getMessage().getText().split(" ")[3]) {
-                                                            case "weapon":
-                                                                //
-                                                                break;
-                                                            case "head":
-                                                                //
-                                                                break;
-                                                            case "chest":
-                                                                //
-                                                                break;
-                                                            case "legs":
-                                                                //
-                                                                break;
-                                                            case "foots":
-                                                                //
-                                                                break;
-                                                            case "talisman":
-                                                                //
-                                                                break;
-                                                            case "heal":
-                                                                //
-                                                                break;
-                                                            default:
-                                                                break;
-                                                        }
                                                     }
+                                                    else
                                                     break;
                                                 case "bar":
                                                     showUnderConstruct(update.getMessage().getFrom().getId(),
@@ -708,36 +685,39 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void showShop(long userId) {
-        List<List<Pair<String, String>>> list = new ArrayList<>();
         UserHero hero = user_hero.findByUserId(userId).get();
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
+        ShopSQL shop = shop_table.findByShopId(shopId);
+        ItemSQL item = new ItemSQL();
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        int i = 0;
 
-        list.get(0).add(new Pair<String, String>(
-                "Оружие" + EmojiParser.parseToUnicode(":archery:"), "/travelTo town shop weapon"));
-        list.get(1).add(new Pair<String, String>(
-                "Берюльки" + EmojiParser.parseToUnicode(":ring:"), "/travelTo town shop talisman"));
-        list.get(2).add(new Pair<String, String>(
-                "Защита головы" + EmojiParser.parseToUnicode(":womans_hat:"), "/travelTo town shop head"));
-        list.get(2).add(new Pair<String, String>(
-                "Защита торса" + EmojiParser.parseToUnicode("🥋"),
-                "/travelTo town shop chest"));
-        list.get(3).add(new Pair<String, String>(
-                "Защита ног" + EmojiParser.parseToUnicode(":jeans:"), "/travelTo town shop legs"));
-        list.get(3).add(new Pair<String, String>(
-                "Ботинки" + EmojiParser.parseToUnicode("🛼"), "/travelTo town shop foots"));
-        list.get(4).add(new Pair<String, String>(
-                "Исцеление" + EmojiParser.parseToUnicode(":pill:"), "/travelTo town shop heal"));
+        for (; i < 3; i++) {
+            item = item_table.findByItemId(Long.parseLong(shop.getWeapon()[i]));
+            list.add(new ArrayList<>());
+            list.get(i).add(new Pair<String, String>(
+                    item.getItemName(), "/travelTo town shop " + item.getItemId()));
+        }
 
-        list.get(5).add(new Pair<String, String>("Назад", "/travelTo town shop"));
+        list.add(new ArrayList<>());
+        list.get(3).add(new Pair<String, String>("Назад", "/travelTo town"));
         editMenuMessage(userId,
                 "Лавка всячестей \n Тут можно купить, все нужное для выживания \n Кошелек: " + hero.getMoney()
                         + " злотых",
                 list);
+    }
+
+    private void showShop(long userId, long itemId) {
+        UserHero hero = user_hero.findByUserId(userId).get();
+        ItemSQL item = item_table.findByItemId(itemId);
+        if (hero.getMoney() >= (item.getItemLevel() * 2)) {
+            hero.setMoney(hero.getMoney() - (item.getItemLevel() * 2));
+            hero.addToInventory(itemId);
+            user_hero.save(hero);
+        }
+        else{
+            sendMessage(userId, "Нет денег!");
+        }
+
     }
 
     private void shopGenerator() {
@@ -749,62 +729,62 @@ public class TelegramBot extends TelegramLongPollingBot {
         Long random = ThreadLocalRandom.current().nextLong(0, 10000);
         shopId = random;
         shop.setShopId(random);
-        List<ItemSQL> itemsList = item_table.findByAllItemType("weapon");
+        List<ItemSQL> itemsList = item_table.findByItemType("weapon");
         String str = "";
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 3; j++) {
             Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
             str += itemsList.get(rnd).getItemId() + ";";
 
         }
         shop.setWeapon(str.split(";"));
-        itemsList = item_table.findByAllItemType("head");
+        itemsList = item_table.findByItemType("head");
         str = "";
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 3; j++) {
             Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
             str += itemsList.get(rnd).getItemId() + ";";
 
         }
         shop.setHead(str.split(";"));
 
-        itemsList = item_table.findByAllItemType("chest");
+        itemsList = item_table.findByItemType("chest");
         str = "";
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 3; j++) {
             Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
             str += itemsList.get(rnd).getItemId() + ";";
 
         }
         shop.setChest(str.split(";"));
 
-        itemsList = item_table.findByAllItemType("legs");
+        itemsList = item_table.findByItemType("legs");
         str = "";
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 3; j++) {
             Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
             str += itemsList.get(rnd).getItemId() + ";";
 
         }
         shop.setLegs(str.split(";"));
 
-        itemsList = item_table.findByAllItemType("foots");
+        itemsList = item_table.findByItemType("foots");
         str = "";
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 3; j++) {
             Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
             str += itemsList.get(rnd).getItemId() + ";";
 
         }
         shop.setFoots(str.split(";"));
 
-        itemsList = item_table.findByAllItemType("talisman");
+        itemsList = item_table.findByItemType("talisman");
         str = "";
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 3; j++) {
             Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
             str += itemsList.get(rnd).getItemId() + ";";
 
         }
         shop.setTalisman(str.split(";"));
 
-        itemsList = item_table.findByAllItemType("heal");
+        itemsList = item_table.findByItemType("heal");
         str = "";
-        for (int j = 0; j < 5; j++) {
+        for (int j = 0; j < 3; j++) {
             Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
             str += itemsList.get(rnd).getItemId() + ";";
 

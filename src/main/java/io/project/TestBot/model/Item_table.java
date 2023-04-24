@@ -5,5 +5,8 @@ import java.util.List;
 import org.springframework.data.repository.CrudRepository;
 
 public interface Item_table extends CrudRepository<ItemSQL, Long> {
-    List<ItemSQL> findByAllItemType(String itemType);
+    // Iterable<ItemSQL> findByAllItemType(String itemType);
+    List<ItemSQL> findByItemType(String itemType);
+
+    ItemSQL findByItemId(Long itemId);
 }
