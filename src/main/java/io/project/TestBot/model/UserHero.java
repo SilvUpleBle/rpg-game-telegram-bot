@@ -27,6 +27,10 @@ public class UserHero {
 
     private String equipment = "0;0;0;0;0;0";
 
+    private Long[] equipedSkills = new Long[4];
+
+    private List<Long> skills;
+
     private Long idGroup;
 
     public long getUserId() {
@@ -165,4 +169,53 @@ public class UserHero {
     public void subPoints(int points) {
         this.points -= points;
     }
+
+    public void setEquipment(String equipment) {
+        this.equipment = equipment;
+    }
+
+    public Long[] getEquipedSkills() {
+        checkSkills();
+        return equipedSkills;
+    }
+
+    private void checkSkills() {
+        if (equipedSkills == null) {
+            equipedSkills = new Long[4];
+        }
+        if (skills == null) {
+            skills = new ArrayList<>();
+        }
+    }
+
+    public void equipSkill(Long skillId, int position) {
+        checkSkills();
+        equipedSkills[position] = skillId;
+        skills.remove(skillId);
+    }
+
+    public void unequipSkill(Long skillId, int position) {
+        checkSkills();
+        equipedSkills[position] = null;
+        skills.add(skillId);
+    }
+
+    public void setEquipedSkills(Long[] equipedSkills) {
+        this.equipedSkills = equipedSkills;
+    }
+
+    public List<Long> getSkills() {
+        checkSkills();
+        return skills;
+    }
+
+    public void addSkill(Long skillId) {
+        checkSkills();
+        skills.add(skillId);
+    }
+
+    public void setSkills(List<Long> skills) {
+        this.skills = skills;
+    }
+
 }

@@ -20,6 +20,7 @@ import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -160,8 +161,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(chatId, "Входящее сообщение не должно превышать 255 символов! Попробуйте ещё раз!");
                     return;
                 }
-                user.setWaitForRequest(false);
-                user_state.save(user);
+                if (!user.getProcess().equals("/battle")) {
+                    user.setWaitForRequest(false);
+                    user_state.save(user);
+                }
 
                 switch (user.getProcess()) {
                     case "/create_hero":
@@ -192,11 +195,25 @@ public class TelegramBot extends TelegramLongPollingBot {
                         user_state.save(user);
                         changeHeroName(update.getMessage().getFrom().getId());
                         break;
+                    case "/battle":
+                        switch (messageText) {
+                            case "/showBattleMessage":
+                                showBattleMessage(user.getUserId());
+                                break;
+                            case "/showHeroSkillsInBattle":
+                                showHeroSkillsInBattle(user.getUserId());
+                                break;
+                            case "/useSkill":
+
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
                     default:
                         break;
 
                 }
-
             } else {
                 if (messageText.equals("/cancel") || user.getProcess() == null
                         || messageText.equals("/cancel@tstbtstst_bot")) {
@@ -382,15 +399,47 @@ public class TelegramBot extends TelegramLongPollingBot {
                                             "\"Лови маслину\" - крикнул <b>%s</b>, используя <b><i>%s</i></b>" });
                             skill_table.save(skill);
                             break;
+                        case "/giveSkill", "/giveSkill@tstbtstst_bot":
+                            UserHero hero = user_hero.findById(update.getMessage().getFrom().getId()).get();
+                            hero.addSkill(Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            user_hero.save(hero);
+                            break;
                         case "/showSkill", "/showSkill@tstbtstst_bot":
                             SkillSQL skilll = skill_table.findById(Long.valueOf(1)).get();
                             sendMessage(update.getMessage().getFrom().getId(), skilll.getSkillPhrases()[0]);
                             sendMessage(update.getMessage().getFrom().getId(), skilll.getSkillPhrases()[1]);
                             break;
+                        case "/equipSkill", "/equipSkill@tstbtstst_bot":
+                            UserHero hero1 = user_hero.findById(update.getMessage().getFrom().getId()).get();
+                            hero1.equipSkill(Long.valueOf(update.getMessage().getText().split(" ")[1]),
+                                    Integer.valueOf(update.getMessage().getText().split(" ")[2]));
+                            user_hero.save(hero1);
+                            showChangeSkills(update.getMessage().getFrom().getId());
+                            break;
+                        case "/unequipSkill", "/unequipSkill@tstbtstst_bot":
+                            UserHero hero2 = user_hero.findById(update.getMessage().getFrom().getId()).get();
+                            hero2.unequipSkill(Long.valueOf(update.getMessage().getText().split(" ")[1]),
+                                    Integer.valueOf(update.getMessage().getText().split(" ")[2]));
+                            user_hero.save(hero2);
+                            showChangeSkills(update.getMessage().getFrom().getId());
+                            break;
                         case "/createUserBattle", "/createUserBattle@tstbtstst_bot":
                             createUserBattle(update.getMessage().getFrom().getId(),
                                     Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
+                        case "/showChangeSkills", "/showChangeSkills@tstbtstst_bot":
+                            showChangeSkills(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showAvailableSkills", "/showAvailableSkills@tstbtstst_bot":
+                            showAvailableSkills(update.getMessage().getFrom().getId(),
+                                    Integer.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/showSkillInfo", "/showSkillInfo@tstbtstst_bot":
+                            showSkillInfo(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]),
+                                    Integer.valueOf(update.getMessage().getText().split(" ")[2]));
+                            break;
+
                         case "/createItems":
                             List<ItemSQL> list = new ArrayList<>();
                             list.add(new ItemSQL((long) 0, "ничегошеньки", "all", 0));
@@ -406,9 +455,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                             break;
 
                         default:
-                            sendMessage(chatId, "Не понимаю команду!");
                             user.setLastUserMessage(null);
                             user_state.save(user);
+                            sendMessage(chatId, "Не понимаю команду!");
                             break;
                     }
                 } else {
@@ -556,7 +605,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     //
 
     private void createUserBattle(Long userId, Long enemyUserId) {
-        battle_table.save(new BattleSQL("user", new Long[] { userId }, new Long[] { enemyUserId }));
+        BattleSQL battle = battle_table.save(new BattleSQL("user", new Long[] { userId }, new Long[] { enemyUserId }));
         sendMenuMessage(userId,
                 "Битва с <b>%s (@%s)</b> началась!".formatted(user_hero.findById(enemyUserId).get().getHeroName(),
                         user_table.findById(enemyUserId).get().getUserName()));
@@ -565,9 +614,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                         user_table.findById(userId).get().getUserName()));
         UserState user = user_state.findById(userId).get();
         user.setProcess("/battle");
+        user.setBattleId(battle.getBattleId());
         UserState enemy = user_state.findById(enemyUserId).get();
         enemy.setProcess("/battle");
         enemy.setWaitForRequest(true);
+        enemy.setBattleId(battle.getBattleId());
         user_state.save(user);
         user_state.save(enemy);
         showBattleMessage(userId);
@@ -577,7 +628,65 @@ public class TelegramBot extends TelegramLongPollingBot {
     // TODO прописать метод, который позволит брать battleSQL из таблицы,
     // TODO сделать его универсальным (и для арены, и для подземелья)
     private void showBattleMessage(Long userId) {
+        UserState userState = user_state.findById(userId).get();
+        UserSQL user;
+        UserHero hero;
+        BattleSQL battle = battle_table.findById(userState.getBattleId()).get();
+        String textToSend = "Битва:\n\nВаша команда:\n";
+        Long[] teammates;
+        Long[] enemyTeam;
+        if (Arrays.asList(battle.getFirstSideIds()).contains(userId)) {
+            teammates = battle.getFirstSideIds();
+            enemyTeam = battle.getSecondSideIds();
+        } else {
+            teammates = battle.getSecondSideIds();
+            enemyTeam = battle.getFirstSideIds();
+        }
+        for (Long id : teammates) {
+            user = user_table.findById(id).get();
+            hero = user_hero.findById(id).get();
 
+            if (id.equals(userId)) {
+                textToSend += "<b>%s (%s) - %s❤️</b>\n".formatted(hero.getHeroName(), user.getUserName(),
+                        hero.getHealth());
+            } else {
+                textToSend += "%s (%s) - %s❤️\n".formatted(hero.getHeroName(), user.getUserName(),
+                        hero.getHealth());
+            }
+        }
+
+        textToSend += "\n\nКоманда противника:\n";
+        for (Long id : enemyTeam) {
+            user = user_table.findById(id).get();
+            hero = user_hero.findById(id).get();
+            textToSend += "%s (%s) - %s❤️\n".formatted(hero.getHeroName(), user.getUserName(),
+                    hero.getHealth());
+        }
+
+        if (userState.getWaitForRequest()) {
+            List<List<Pair<String, String>>> list = new ArrayList<>();
+            list.add(new ArrayList<>());
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Атаковать", "/showHeroSkillsInBattle"));
+            list.get(0).add(new Pair<String, String>("Сдаться", "/giveUp"));
+            sendMenuMessage(userId, textToSend, list);
+        } else {
+            sendMenuMessage(userId, textToSend);
+        }
+    }
+
+    private void showHeroSkillsInBattle(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        UserHero hero = user_hero.findById(userId).get();
+        for (Long skillId : hero.getEquipedSkills()) {
+            list.add(new ArrayList<>());
+            list.get(list.size() - 2).add(new Pair<String, String>(skill_table.findById(skillId).get().getSkillName(),
+                    "/useSkill " + skillId));
+        }
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад",
+                "/showBattleMessage"));
+        editMenuMessage(userId, "Способности героя:", list);
     }
 
     private void showMenu(long userId) {
@@ -590,27 +699,27 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.get(1).add(new Pair<String, String>("Рейтинг", "/rating"));
         if (user_table.findById(userId).get().isAdmin()) {
             list.add(new ArrayList<>());
-            list.get(2)
-                    .add(new Pair<String, String>(
-                            EmojiParser.parseToUnicode(":hammer:") + "Администрирование"
-                                    + EmojiParser.parseToUnicode(":hammer:"),
-                            "/administration"));
+            list.get(2).add(new Pair<String, String>("Администрирование🪬", "/administration"));
         }
 
-        if (user_state.findById(userId).get().getLastUserMessage() != null
-                && (user_state.findById(userId).get().getLastUserMessage().equals("/profile")
-                        || user_state.findById(userId).get().getLastUserMessage().equals("/hero")
-                        || user_state.findById(userId).get().getLastUserMessage().equals("/tasks")
-                        || user_state.findById(userId).get().getLastUserMessage().equals("/administration")
-                        || user_state.findById(userId).get().getLastUserMessage().equals("/rating"))) {
-            editMenuMessage(userId, "Меню:", list);
-        } else {
-            sendMenuMessage(userId, "Меню:", list);
-        }
+        /*
+         * if (user_state.findById(userId).get().getLastUserMessage() != null
+         * && (user_state.findById(userId).get().getLastUserMessage().equals("/profile")
+         * || user_state.findById(userId).get().getLastUserMessage().equals("/hero")
+         * || user_state.findById(userId).get().getLastUserMessage().equals("/tasks")
+         * || user_state.findById(userId).get().getLastUserMessage().equals(
+         * "/administration")
+         * || user_state.findById(userId).get().getLastUserMessage().equals("/rating")))
+         * {
+         * } else {
+         * sendMenuMessage(userId, "Меню:", list);
+         * }
+         */
 
-        UserState user = user_state.findById(userId).get();
-        user.setLastUserMessage("/menu");
-        user_state.save(user);
+        editMenuMessage(userId, "Меню:", list);
+        // UserState user = user_state.findById(userId).get();
+        // user.setLastUserMessage("/menu");
+        // user_state.save(user);
     }
 
     private void showProfile(long userId) {
@@ -657,13 +766,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
-            list.get(0).add(new Pair<String, String>("Информация", "/heroProfile"));
-            list.get(0).add(new Pair<String, String>("Экипировка", "/heroEquipment"));
-            list.get(1).add(new Pair<String, String>("Инвентарь", "/heroInventory"));
-            list.get(1).add(new Pair<String, String>("Способности", "/heroSkills"));
-            list.get(2).add(new Pair<String, String>("Группа", "/heroGroup"));
-            list.get(2).add(new Pair<String, String>("Отправиться в..." + EmojiParser.parseToUnicode(":runner:"),
-                    "/travelTo"));
+            list.get(0).add(new Pair<String, String>("Информация📃", "/heroProfile"));
+            list.get(0).add(new Pair<String, String>("Экипировка🧍🏻", "/heroEquipment"));
+            list.get(1).add(new Pair<String, String>("Инвентарь🎒", "/heroInventory"));
+            list.get(1).add(new Pair<String, String>("Способности⭐️", "/heroSkills"));
+            list.get(2).add(new Pair<String, String>("Группа👤", "/heroGroup"));
+            list.get(2).add(new Pair<String, String>("Отправиться в...🗺", "/travelTo"));
         }
 
         list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
@@ -674,9 +782,103 @@ public class TelegramBot extends TelegramLongPollingBot {
         user_state.save(user);
     }
 
-    // TODO сделать!!
     private void showHeroSkills(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
 
+        String textToSend = "Cпособности героя:\n\nЭкипированные:\n";
+        UserHero hero = user_hero.findById(userId).get();
+        boolean hideButton = true;
+        for (Long skillId : hero.getEquipedSkills()) {
+            if (skillId == null) {
+                textToSend += "▫️пусто\n";
+            } else {
+                textToSend += "▫️<b>%s</b>\n".formatted(skill_table.findById(skillId).get().getSkillName());
+                hideButton = false;
+            }
+        }
+        textToSend += "\n\nДоступные:\n";
+        if (hero.getSkills().isEmpty()) {
+            textToSend += "▪️пусто";
+        } else {
+            for (Long skillId : hero.getSkills()) {
+                textToSend += "▪️<b>%s</b>\n".formatted(skill_table.findById(skillId).get().getSkillName());
+                hideButton = false;
+            }
+        }
+
+        if (!hideButton) {
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Экипировать способности",
+                    "/showChangeSkills"));
+        }
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад",
+                "/hero"));
+        editMenuMessage(userId, textToSend, list);
+    }
+
+    private void showChangeSkills(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+
+        Long[] equipedSkills = user_hero.findById(userId).get().getEquipedSkills();
+        String textToSend, command;
+        for (Long id : equipedSkills) {
+            list.add(new ArrayList<>());
+            if (id != null) {
+                textToSend = skill_table.findById(id).get().getSkillName();
+                command = "/showSkillInfo %d %d".formatted(id, list.size() - 2);
+            } else {
+                textToSend = " ";
+                command = "/showAvailableSkills " + (list.size() - 2);
+            }
+            list.get(list.size() - 2).add(new Pair<String, String>(textToSend, command));
+        }
+        list.get(4).add(new Pair<String, String>("Назад", "/heroSkills"));
+        textToSend = "Экипированные слоты:";
+        editMenuMessage(userId, textToSend, list);
+    }
+
+    private void showAvailableSkills(Long userId, int position) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        List<Long> skills = user_hero.findById(userId).get().getSkills();
+        for (Long id : skills) {
+            list.add(new ArrayList<>());
+            list.get(list.size() - 2).add(
+                    new Pair<String, String>(skill_table.findById(id).get().getSkillName(),
+                            "/showSkillInfo %d %d".formatted(id, position)));
+        }
+
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/heroSkills"));
+        editMenuMessage(userId, "Выберите способность:", list);
+    }
+
+    private void showSkillInfo(Long userId, Long skillId, int position) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+
+        boolean isForRemove = false;
+        for (Long id : user_hero.findById(userId).get().getEquipedSkills()) {
+            if (skillId.equals(id)) {
+                isForRemove = true;
+                break;
+            }
+        }
+
+        SkillSQL skill = skill_table.findById(skillId).get();
+        String textToSend = "Название: <b>%s</b>\n\nПрименение: <b>%s</b>\n\nЭффект: <b>%s</b>"
+                .formatted(skill.getSkillName(), skill.getSkillTarget(), skill.getSkillEffect());
+        if (isForRemove) {
+            list.get(list.size() - 2)
+                    .add(new Pair<String, String>("Снять", "/unequipSkill %d %d".formatted(skillId, position)));
+        } else {
+            list.get(list.size() - 2)
+                    .add(new Pair<String, String>("Использовать", "/equipSkill %d %d".formatted(skillId, position)));
+        }
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/showChangeSkills"));
+        editMenuMessage(userId, textToSend, list);
     }
 
     private void showHeroProfile(Long userId) {
@@ -687,7 +889,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.get(1).add(new Pair<String, String>("Назад", "/hero"));
 
         UserHero hero = user_hero.findById(userId).get();
-        String textToSend = "Профиль героя:\n\nИмя героя: <b>%s</b>\n\nЗдоровье героя: <b>%s</b>\n\nУровень силы героя: <b>%s</b>\n\nКоличество монет: <b>%d</b>\n\nКоличество алмазов: <b>%d</b>\n\nГруппа героя: <b>%s</b>"
+        String textToSend = "Профиль героя:\n\nИмя героя: <b>%s</b>\n\nЗдоровье героя: <b>%s</b>❤️\n\nУровень силы героя: <b>%s</b>\n\nКоличество монет: <b>%d</b>\n\nКоличество алмазов: <b>%d</b>\n\nГруппа героя: <b>%s</b>"
                 .formatted(hero.getHeroName(), hero.getHealth(), hero.getForcePower(), hero.getMoney(),
                         hero.getPoints(), hero.getIdGroup() == null ? "не состоит в группе"
                                 : hero_groups.findById(hero.getIdGroup()).get().getGroupName());
@@ -788,19 +990,23 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         UserHero hero = user_hero.findById(userId).get();
         String[] inventory = hero.getInventory().split(";");
-        for (String itemId : inventory) {
-            if (item_table.findById(Long.valueOf(itemId)).get().getItemType().equals(type)) {
+        if (!inventory[0].equals("")) {
+            for (String itemId : inventory) {
+                if (item_table.findById(Long.valueOf(itemId)).get().getItemType().equals(type)) {
+                    list.add(new ArrayList<>());
+                    list.get(list.size() - 2).add(
+                            new Pair<String, String>(
+                                    "Надеть " + item_table.findById(Long.valueOf(itemId)).get().toString(),
+                                    "/changeEquipmentTo " + typeItem + " " + Long.valueOf(itemId)));
+                }
+            }
+            if (!hero.getEquipment()[typeItem].equals("0")) {
                 list.add(new ArrayList<>());
                 list.get(list.size() - 2).add(
-                        new Pair<String, String>("Надеть " + item_table.findById(Long.valueOf(itemId)).get().toString(),
-                                "/changeEquipmentTo " + typeItem + " " + Long.valueOf(itemId)));
+                        new Pair<String, String>("Снять", "/changeEquipmentTo " + typeItem + " " + 0));
             }
         }
-        if (!hero.getEquipment()[typeItem].equals("0")) {
-            list.add(new ArrayList<>());
-            list.get(list.size() - 2).add(
-                    new Pair<String, String>("Снять", "/changeEquipmentTo " + typeItem + " " + 0));
-        }
+
         list.get(list.size() - 1).add(
                 new Pair<String, String>("Назад",
                         "/heroEquipment"));
