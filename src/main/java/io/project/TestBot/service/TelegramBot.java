@@ -2437,6 +2437,25 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void sendMessageWithLastMessageId(long chatId, String textToSend, Long taskId,
+            List<List<Pair<String, String>>> buttons) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        message.enableHtml(true);
+        message.setReplyMarkup(createInlineKeyboard(buttons));
+
+        try {
+            Message msg = execute(message);
+            TaskSQL task = task_table.findByTaskId(taskId);
+            task.setMessageId(msg.getMessageId());
+            task_table.save(task);
+
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
     private void sendMenuMessage(long chatId, String textToSend, List<List<Pair<String, String>>> buttons) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
