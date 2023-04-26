@@ -576,6 +576,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             break;
                         case "/createItems":
                             List<ItemSQL> list = new ArrayList<>();
+                            // lvl1
                             list.add(new ItemSQL((long) 0, "ничегошеньки", "all", 0, 0));
                             list.add(new ItemSQL((long) 1, "яблоко", "heal", 1, 5));
                             list.add(new ItemSQL((long) 2, "палка-убивалка", "weapon", 1, 5));
@@ -585,6 +586,36 @@ public class TelegramBot extends TelegramLongPollingBot {
                             list.add(new ItemSQL((long) 6, "сапоги-скороходы", "foots", 1, 1));
                             list.add(new ItemSQL((long) 7, "кольцо всевластия", "talisman", 1, 1));
                             list.add(new ItemSQL((long) 8, "тетрадь в горошек", "loot", 1, 5));
+                            // lvl 2
+                            list.add(new ItemSQL((long) 9, "атаковальня", "weapon", 2, 8));
+                            list.add(new ItemSQL((long) 10, "ай-кьюдри", "head", 2, 7));
+                            list.add(new ItemSQL((long) 11, "бронежеле", "chest", 2, 6));
+                            list.add(new ItemSQL((long) 12, "балласты", "legs", 2, 10));
+                            list.add(new ItemSQL((long) 13, "олимпийские икры", "foots", 2, 9));
+                            list.add(new ItemSQL((long) 14, "магнитик на доспех", "talisman", 2, 8));
+                            list.add(new ItemSQL((long) 15, "бабушкин пирог", "heal", 2, 9));
+                            list.add(new ItemSQL((long) 16, "кадрило", "loot", 2, 11));
+                            // lvl 3
+                            list.add(new ItemSQL((long) 17, "имба-ланс", "weapon", 3, 17));
+                            list.add(new ItemSQL((long) 18, "моднокль", "head", 3, 10));
+                            list.add(new ItemSQL((long) 19, "ремень безопасности", "chest", 3, 11));
+                            list.add(new ItemSQL((long) 20, "малиновые штаны", "legs", 3, 11));
+                            list.add(new ItemSQL((long) 21, "икронужные мышцы", "foots", 3, 12));
+                            list.add(new ItemSQL((long) 22, "фартбилет", "talisman", 3, 16));
+                            list.add(new ItemSQL((long) 23, "хилюля", "heal", 3, 13));
+                            list.add(new ItemSQL((long) 24, "искра разума", "loot", 3, 14));
+                            // lvl 4
+                            list.add(new ItemSQL((long) 25, "железобатон", "weapon", 4, 15));
+                            list.add(new ItemSQL((long) 26, "оптоволоконный парик", "head", 4, 16));
+                            list.add(new ItemSQL((long) 27, "драпательное пальто", "chest", 4, 18));
+                            list.add(new ItemSQL((long) 28, "лосины ассасина", "legs", 4, 17));
+                            list.add(new ItemSQL((long) 29, "до-колен-вал", "foots", 4, 17));
+                            list.add(new ItemSQL((long) 30, "ожирелье", "talisman", 4, 22));
+                            list.add(new ItemSQL((long) 31, "иконка со свечкой", "heal", 4, 5));
+                            list.add(new ItemSQL((long) 32, "окаменевший пельмень", "loot", 4, 20));
+
+                            // imba
+                            list.add(new ItemSQL((long) 27, "Доспех Императора Человечества", "chest", 26, 150));
                             createItems(list);
                             break;
 
