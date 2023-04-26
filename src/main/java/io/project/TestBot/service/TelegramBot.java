@@ -21,7 +21,6 @@ import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
-
 import java.io.File;
 import java.sql.Date;
 import java.time.LocalDate;
@@ -276,20 +275,27 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user_state.save(user);
                             createTask(update.getMessage(), (byte) 1);
                             break;
+                        case "/task_agree", "/task_agree@tstbtstst_bot":
+                            agreeTask(update.getMessage(), Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
                         case "/edit_task":
                             user.setProcess("/edit_task");
                             user_state.save(user);
-                            editTask(update.getMessage(), (byte) 1);
+                            editTask(update.getMessage(), (byte) 1,
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/delete_task":
-                            user.setProcess("/delete_task");
-                            user_state.save(user);
-                            deleteTask(update.getMessage(), (byte) 1);
+                            deleteTask(update.getMessage(), Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/show_creators_tasks":
-                            user.setProcess("/show_creators_tasks");
-                            user_state.save(user);
-                            showCreatorsTasks(update.getMessage());
+                            showCreatorsTasks(update.getMessage().getFrom().getId());
+                            break;
+                        case "/adminTasks", "/adminTasks@tstbtstst_bot":
+                            adminTasks(update.getMessage().getFrom().getId());
+                            break;
+                        case "/showAdminTask":
+                            showAdminTask(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/get_rights", "/get_rights@tstbtstst_bot":
                             getAdminRights(update.getMessage());
