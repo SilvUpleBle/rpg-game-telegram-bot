@@ -14,68 +14,14 @@ public class ShopSQL {
     // talisman
     // heal
     private Long shopId;
-    private String[] weapon;
-    private String[] head;
-    private String[] chest;
-    private String[] legs;
-    private String[] foots;
-    private String[] talisman;
-    private String[] heal;
+    private String[] itemId;
 
-    public String[] getHeal() {
-        return heal;
+    public String[] getItemId() {
+        return itemId;
     }
 
-    public void setHeal(String[] heal) {
-        this.heal = heal;
-    }
-
-    public String[] getTalisman() {
-        return talisman;
-    }
-
-    public void setTalisman(String[] talisman) {
-        this.talisman = talisman;
-    }
-
-    public String[] getFoots() {
-        return foots;
-    }
-
-    public void setFoots(String[] foots) {
-        this.foots = foots;
-    }
-
-    public String[] getLegs() {
-        return legs;
-    }
-
-    public void setLegs(String[] legs) {
-        this.legs = legs;
-    }
-
-    public String[] getChest() {
-        return chest;
-    }
-
-    public void setChest(String[] chest) {
-        this.chest = chest;
-    }
-
-    public String[] getHead() {
-        return head;
-    }
-
-    public void setHead(String[] head) {
-        this.head = head;
-    }
-
-    public String[] getWeapon() {
-        return weapon;
-    }
-
-    public void setWeapon(String[] weapon) {
-        this.weapon = weapon;
+    public void setItemId(String[] itemId) {
+        this.itemId = itemId;
     }
 
     public Long getShopId() {

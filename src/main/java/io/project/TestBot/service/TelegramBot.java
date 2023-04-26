@@ -17,11 +17,17 @@ import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
+import java.io.File;
+import java.sql.Date;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -41,6 +47,7 @@ import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
@@ -51,9 +58,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMar
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-
 import com.vdurmont.emoji.EmojiParser;
-
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -84,7 +89,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             "https://sun9-62.userapi.com/impg/VE9gMyTK8T9I3MMPlXr-5czLv4Oxwhh3ky-k_g/K-NrldqmyA0.jpg?size=1280x1225&quality=96&sign=0ddb8766cbd12ac72a75a3cccb4d5252&type=album" };
 
     static final String HELP_TEXT = "help text";
-    Long shopId;
 
     public TelegramBot(BotConfig config) {
         this.config = config;
@@ -173,6 +177,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                         editTask(update.getMessage(), (byte) user.getStep(),
                                 Long.valueOf(user.getLastUserMessage()));
                         break;
+                    case "/submit_task_by_user":
+                        editTask(update.getMessage(), (byte) user.getStep(),
+                                Long.valueOf(user.getLastUserMessage()));
+                        break;
+
                     case "/delete_user":
                         deleteUser(update.getMessage(), (byte) user.getStep());
                         break;
@@ -276,8 +285,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                                     Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/submit_task_by_user", "/submit_task_by_user@tstbtstst_bot":
-                            submitTaskByUser(update.getMessage().getFrom().getId(),
-                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            user.setProcess("/submit_task_by_user");
+                            user_state.save(user);
+                            submitTaskByUser(update.getMessage(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]), (byte) 1);
                             break;
                         case "/submitTaskByAdmin", "/submitTaskByAdmin@tstbtstst_bot":
                             submitTaskByAdmin(update.getMessage().getFrom().getId(),
@@ -371,17 +382,55 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                 new Pair<String, String>("Назад", "/travelTo"));
                                         break;
                                     case "town":
-                                        if (update.getMessage().getText().split(" ").length == 2) {
+                                        Integer len = update.getMessage().getText().split(" ").length;
+                                        if (len == 2) {
                                             showTown(update.getMessage().getFrom().getId());
                                         } else {
                                             switch (update.getMessage().getText().split(" ")[2]) {
                                                 case "shop":
-                                                    if (update.getMessage().getText().split(" ").length == 3) {
-                                                        shopGenerator();
+                                                    if (len == 3) {
                                                         showShop(update.getMessage().getFrom().getId());
+                                                    } else {
+                                                        if (len >= 4) {
+
+                                                            switch (update.getMessage().getText().split(" ")[3]) {
+                                                                case "roll":
+                                                                    shopRoll(update.getMessage().getFrom().getId());
+
+                                                                    break;
+                                                                // case "randomBox":
+                                                                // break;
+                                                                case "show":
+                                                                    if (len == 4) {
+                                                                        showProduct(
+                                                                                update.getMessage().getFrom().getId());
+                                                                    } else {
+                                                                        buyProduct(
+                                                                                update.getMessage().getFrom()
+                                                                                        .getId(),
+                                                                                update.getMessage().getText()
+                                                                                        .split(" ")[4]);
+                                                                    }
+                                                                    break;
+                                                                case "sell":
+
+                                                                    if (len == 4) {
+                                                                        showMyItems(
+                                                                                update.getMessage().getFrom().getId());
+                                                                    } else {
+                                                                        sellMyItems(
+                                                                                update.getMessage().getFrom()
+                                                                                        .getId(),
+                                                                                update.getMessage().getText()
+                                                                                        .split(" ")[4]);
+                                                                    }
+                                                                    break;
+                                                            }
+
+                                                        }
                                                     }
-                                                    else
                                                     break;
+
                                                 case "bar":
                                                     showUnderConstruct(update.getMessage().getFrom().getId(),
                                                             new Pair<String, String>("Назад", "/travelTo"));
@@ -409,6 +458,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                     }
                                                     break;
                                                 case "wedding":
+                                                    showUnderConstruct(update.getMessage().getFrom().getId(),
+                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                    break;
+                                                case "library":
                                                     showUnderConstruct(update.getMessage().getFrom().getId(),
                                                             new Pair<String, String>("Назад", "/travelTo"));
                                                     break;
@@ -667,130 +720,194 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
         list.get(0).add(new Pair<String, String>(
                 "Таверна" + EmojiParser.parseToUnicode(":beer:"), "/travelTo town bar"));
         list.get(1).add(
                 new Pair<String, String>("Лавка торговца" + EmojiParser.parseToUnicode(":convenience_store:"),
                         "/travelTo town shop"));
         list.get(2).add(
+                new Pair<String, String>("Библиотека 📚",
+                        "/travelTo town shop"));
+        list.get(3).add(
                 new Pair<String, String>("Лавка целителя" + EmojiParser.parseToUnicode(":hospital:"),
                         "/travelTo town hospital"));
-        list.get(3).add(
+        list.get(4).add(
                 new Pair<String, String>("Бракосочетальная" + EmojiParser.parseToUnicode(":wedding:"),
                         "/travelTo town wedding"));
-        list.get(4).add(new Pair<String, String>("Назад", "/travelTo"));
+        list.get(5).add(new Pair<String, String>("Назад", "/travelTo"));
         editMenuMessage(userId,
                 "Добро пожаловать! Добро пожаловать в Сити 17.\n Сами вы его выбрали, или его выбрали за вас — это лучший город из оставшихся.\n Я такого высокого мнения о Сити 17, что решил разместить свое правительство здесь, в Цитадели, столь заботливо предоставленной нашими Покровителями.\n Я горжусь тем, что называю Сити 17 своим домом.\n Итак, собираетесь ли вы остаться здесь, или же вас ждут неизвестные дали, добро пожаловать в Сити 17. Здесь безопасно.",
                 list);
     }
 
     private void showShop(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>(
+                "Поменять ассортимент в продаже 🎰", "/travelTo town shop roll"));
+        list.get(1).add(new Pair<String, String>(
+                "Показать товары 🧳", "/travelTo town shop show"));
+        list.get(2).add(new Pair<String, String>(
+                "Продать свои вещи 💰", "/travelTo town shop sell"));
+        list.get(3).add(new Pair<String, String>("Назад", "/travelTo town"));
+        editMenuMessage(userId,
+                "Лавка торговца, тут можно купить новые и продать старые вещи!",
+                list);
+    }
+
+    private void showProduct(long userId) {
         UserHero hero = user_hero.findByUserId(userId).get();
-        ShopSQL shop = shop_table.findByShopId(shopId);
+        ShopSQL shop = shop_table.findByShopId(userId);
         ItemSQL item = new ItemSQL();
         List<List<Pair<String, String>>> list = new ArrayList<>();
-        int i = 0;
-
-        for (; i < 3; i++) {
-            item = item_table.findByItemId(Long.parseLong(shop.getWeapon()[i]));
+        int k = 0;
+        for (int i = 0; i < 7; i++) {// 7 - категорий к продаже
             list.add(new ArrayList<>());
-            list.get(i).add(new Pair<String, String>(
-                    item.getItemName(), "/travelTo town shop " + item.getItemId()));
+            for (int j = 0; j < shop.getItemId().length / 7 / 2; j++) {
+                item = item_table.findByItemId(Long.parseLong(shop.getItemId()[k]));
+                k++;
+                list.get(i).add(new Pair<String, String>(
+                        item.toStringWithType(), "/travelTo town shop show " + item.getItemId()));
+            }
         }
 
         list.add(new ArrayList<>());
-        list.get(3).add(new Pair<String, String>("Назад", "/travelTo town"));
+        list.get(7).add(new Pair<String, String>("Назад", "/travelTo town shop"));
         editMenuMessage(userId,
-                "Лавка всячестей \n Тут можно купить, все нужное для выживания \n Кошелек: " + hero.getMoney()
+                "Тут можно купить, все нужное для выживания \n Кошелек: " + hero.getMoney()
                         + " злотых",
                 list);
     }
 
-    private void showShop(long userId, long itemId) {
+    private void buyProduct(long userId, String itemIdStr) {
+
+        long itemId = Long.parseLong(itemIdStr);
         UserHero hero = user_hero.findByUserId(userId).get();
         ItemSQL item = item_table.findByItemId(itemId);
-        if (hero.getMoney() >= (item.getItemLevel() * 2)) {
-            hero.setMoney(hero.getMoney() - (item.getItemLevel() * 2));
+        Integer price = 5 + item.getItemLevel() * 10;
+        if (hero.getMoney() >= price) {
+            hero.setMoney(hero.getMoney() - price);
             hero.addToInventory(itemId);
             user_hero.save(hero);
-        }
-        else{
-            sendMessage(userId, "Нет денег!");
+            showShop(userId);
+            List<List<Pair<String, String>>> list = new ArrayList<>();
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Назад", "/travelTo town shop show"));
+            editMenuMessage(userId,
+                    "Поздравляем, вы приобрели: " + item.toStringWithType() + " за "
+                            + price + " злотых",
+                    list);
+        } else {
+            List<List<Pair<String, String>>> list = new ArrayList<>();
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Назад", "/travelTo town shop"));
+            editMenuMessage(userId,
+                    "Товар стоит " + price + " слишком бедны (˚ ˃̣̣̥⌓˂̣̣̥ )",
+                    list);
         }
 
     }
 
-    private void shopGenerator() {
-        if (shop_table.count() != 0) {
-            shop_table.deleteAll();
+    private void shopGenerator(long userId) {
+        if (shop_table.findByShopId(userId) != null) {
+            ShopSQL delShop = shop_table.findByShopId(userId);
+            shop_table.delete(delShop);
         }
-        ShopSQL shop = new ShopSQL();
 
-        Long random = ThreadLocalRandom.current().nextLong(0, 10000);
-        shopId = random;
-        shop.setShopId(random);
-        List<ItemSQL> itemsList = item_table.findByItemType("weapon");
+        Iterable<UserSQL> users = user_table.findAll();
+        List<UserSQL> userList = new ArrayList<>();
+        String[] typeList = { "weapon", "head", "chest", "legs", "foots", "talisman", "heal" };
+        List<ItemSQL> itemsList = new ArrayList<>();
+        Integer rnd;
         String str = "";
-        for (int j = 0; j < 3; j++) {
-            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-            str += itemsList.get(rnd).getItemId() + ";";
-
+        users.forEach(userList::add);
+        for (int i = 0; i < userList.size(); i++) {
+            ShopSQL shop = new ShopSQL();
+            shop.setShopId(userList.get(i).getUserId());
+            for (String type : typeList) {
+                itemsList = item_table.findByItemType(type);
+                for (int k = 0; k < 2; k++) {
+                    rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+                    str += itemsList.get(rnd).getItemId() + ";";
+                }
+            }
+            shop.setItemId(str.split(";"));
+            shop_table.save(shop);
         }
-        shop.setWeapon(str.split(";"));
-        itemsList = item_table.findByItemType("head");
-        str = "";
-        for (int j = 0; j < 3; j++) {
-            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-            str += itemsList.get(rnd).getItemId() + ";";
+        showShop(userId);
 
+    }
+
+    private void shopRoll(long userId) {
+        UserHero hero = user_hero.findByUserId(userId).get();
+        Integer price = 10;
+        if (hero.getMoney() >= price) {
+            hero.setMoney(hero.getMoney() - price);
+            user_hero.save(hero);
+            shopGenerator(userId);
+            List<List<Pair<String, String>>> list = new ArrayList<>();
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Назад", "/travelTo town shop"));
+            editMenuMessage(userId,
+                    "Ассортимент товаров обновлен!🆕🔥",
+                    list);
+        } else {
+            List<List<Pair<String, String>>> list = new ArrayList<>();
+            list.add(new ArrayList<>());
+            list.get(0).add(new Pair<String, String>("Назад", "/travelTo town shop"));
+            editMenuMessage(userId,
+                    "Обновление товара стоит " + price + " слишком бедны (˚ ˃̣̣̥⌓˂̣̣̥ )",
+                    list);
         }
-        shop.setHead(str.split(";"));
+    }
 
-        itemsList = item_table.findByItemType("chest");
-        str = "";
-        for (int j = 0; j < 3; j++) {
-            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-            str += itemsList.get(rnd).getItemId() + ";";
-
+    private void showMyItems(long userId) {
+        UserHero hero = user_hero.findByUserId(userId).get();
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        String[] itemsId = hero.getInventory().split(";");
+        // (число + делитель - 1) / делитель
+        // округление в большую сторону
+        int i = 0;
+        for (; i < itemsId.length; i++) {
+            list.add(new ArrayList<>());
+            ItemSQL item = item_table.findByItemId(Long.parseLong(itemsId[i]));
+            list.get(i).add(new Pair<String, String>(
+                    item.toStringWithType(),
+                    "/travelTo town shop sell " + itemsId[i]));
         }
-        shop.setChest(str.split(";"));
+        i++;
+        list.add(new ArrayList<>());
+        list.get(i - 1).add(new Pair<String, String>(
+                "Назад",
+                "/travelTo town shop"));
+        editMenuMessage(userId,
+                "Ваши товары.\n Какие вы хотите продать?",
+                list);
 
-        itemsList = item_table.findByItemType("legs");
-        str = "";
-        for (int j = 0; j < 3; j++) {
-            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-            str += itemsList.get(rnd).getItemId() + ";";
+    }
 
-        }
-        shop.setLegs(str.split(";"));
+    private void sellMyItems(long userId, String ItemIdStr) {
+        UserHero hero = user_hero.findByUserId(userId).get();
+        Long itemId = Long.parseLong(ItemIdStr);
+        ItemSQL item = item_table.findByItemId(itemId);
+        Integer price = 5 + item.getItemLevel() * 8;
+        hero.setMoney(hero.getMoney() + price);
+        hero.takeFromInventory(itemId);
+        user_hero.save(hero);
 
-        itemsList = item_table.findByItemType("foots");
-        str = "";
-        for (int j = 0; j < 3; j++) {
-            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-            str += itemsList.get(rnd).getItemId() + ";";
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>(
+                "Назад",
+                "/travelTo town shop sell"));
+        editMenuMessage(userId,
+                "Вы продали " + item.toStringWithType() + " за " + hero.getMoney() + " злотых.",
+                list);
 
-        }
-        shop.setFoots(str.split(";"));
-
-        itemsList = item_table.findByItemType("talisman");
-        str = "";
-        for (int j = 0; j < 3; j++) {
-            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-            str += itemsList.get(rnd).getItemId() + ";";
-
-        }
-        shop.setTalisman(str.split(";"));
-
-        itemsList = item_table.findByItemType("heal");
-        str = "";
-        for (int j = 0; j < 3; j++) {
-            Integer rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-            str += itemsList.get(rnd).getItemId() + ";";
-
-        }
-        shop.setHeal(str.split(";"));
-        shop_table.save(shop);
     }
 
     private void showHospital(long userId) {
@@ -1224,19 +1341,87 @@ public class TelegramBot extends TelegramLongPollingBot {
                 + task.getDateEnd(), list);
     }
 
-    private void submitTaskByUser(Long userId, Long taskId) {
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /*
+     * switch (step) {
+     * case 1:
+     * task = task_table.findByTaskId(taskId);
+     * sendMessage(message.getChatId(), "Напишите что вы хотите изменить",
+     * new String[][] { { "Название", "Описание", "Награда" } });
+     * user.setWaitForRequest(true);
+     * user.setStep((byte) 2);
+     * user_state.save(user);
+     * 
+     * break;
+     * case 2:
+     * switch (message.getText()) {
+     * case "Название", "название":
+     * sendMessage(message.getChatId(), "Введите новое название");
+     * user.setWaitForRequest(true);
+     * user.setStep((byte) 51);
+     * user_state.save(user);
+     * break;
+     * case "Описание", "описание":
+     * sendMessage(message.getChatId(), "Введите новое описание");
+     * user.setWaitForRequest(true);
+     * user.setStep((byte) 52);
+     * user_state.save(user);
+     * break;
+     * case "Награда", "награда":
+     * sendMessage(message.getChatId(), "Введите новую награду");
+     * user.setWaitForRequest(true);
+     * user.setStep((byte) 53);
+     * user_state.save(user);
+     * break;
+     * default:
+     * break;
+     */
+    private void submitTaskByUser(Message message, Long taskId, byte step) {
         TaskSQL task = task_table.findByTaskId(taskId);
-        List<List<Pair<String, String>>> list = new ArrayList<>();
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.get(0).add(new Pair<String, String>("Принять задание",
-                "//submitTaskByAdmin " + taskId));
-        list.get(1).add(new Pair<String, String>("Отказать",
-                "/rejectTask " + taskId));
-        sendMessageWithInlineButtons(task.getCreatorId(),
-                "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
-                        + " Принять задание?",
-                list);
+        UserState user = user_state.findByUserId(message.getFrom().getId());
+        switch (step) {
+            case 1:
+                sendMessage(message.getFrom().getId(), "Отправьте сообщение с фотографией работы и описанием её.");
+                user.setWaitForRequest(true);
+                user.setStep((byte) 2);
+                user_state.save(user);
+                break;
+            case 2:
+                sendMessage(message.getFrom().getId(), "case 2");
+                sendMessageWithPhoto(message, message.getText());
+
+                break;
+        }
+        /*
+         * List<List<Pair<String, String>>> list = new ArrayList<>();
+         * list.add(new ArrayList<>());
+         * list.add(new ArrayList<>());
+         * list.get(0).add(new Pair<String, String>("Принять задание",
+         * "//submitTaskByAdmin " + taskId));
+         * list.get(1).add(new Pair<String, String>("Отказать",
+         * "/rejectTask " + taskId));
+         * sendMessageWithInlineButtons(task.getCreatorId(),
+         * "Задание: " + task.getTaskName() + "\n" + "Описание: " +
+         * task.getTaskDescription() + "\n"
+         * + " Принять задание?",
+         * list);
+         */
+    }
+
+    private void sendMessageWithPhoto(Message message, String textToSend) {
+        long chat_id = message.getFrom().getId();
+        List<PhotoSize> photos = message.getPhoto();
+        log.info(photos.get(0).getFileId());
+        SendPhoto msg = new SendPhoto();
+
+        msg.setChatId(String.valueOf(chat_id));
+        msg.setPhoto(new InputFile(photos.get(0).getFileId()));
+        msg.setCaption(textToSend);
+        try {
+            execute(msg);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
     }
 
     private void submitTaskByAdmin(Long userId, Long taskId) {
