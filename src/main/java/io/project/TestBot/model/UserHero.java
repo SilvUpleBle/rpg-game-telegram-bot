@@ -15,8 +15,6 @@ public class UserHero {
 
     private String heroName;
 
-    private int forcePower = 0;
-
     private String health = "10/10";
 
     private int money = 0;
@@ -32,6 +30,18 @@ public class UserHero {
     private List<Long> skills;
 
     private Long idGroup;
+
+    private int level = 1;
+
+    private int experience = 0;
+
+    private int armor = 0;
+
+    private int minAttack = 0;
+
+    private int maxAttack = 5;
+
+    private int criticalChance = 0;
 
     public long getUserId() {
         return userId;
@@ -49,14 +59,6 @@ public class UserHero {
         this.heroName = heroName;
     }
 
-    public long getForcePower() {
-        return forcePower;
-    }
-
-    public void setForcePower(int forcePower) {
-        this.forcePower = forcePower;
-    }
-
     public String getInventory() {
         return inventory;
     }
@@ -66,7 +68,12 @@ public class UserHero {
     }
 
     public void addToInventory(Long itemId) {
-        List<String> list = new ArrayList<>(Arrays.asList(inventory.split(";")));
+        List<String> list;
+        if (!inventory.split(";")[0].equals("")) {
+            list = new ArrayList<>(Arrays.asList(inventory.split(";")));
+        } else {
+            list = new ArrayList<>();
+        }
         list.add(String.valueOf(itemId));
         inventory = "";
         inventory += list.get(0);
@@ -91,7 +98,7 @@ public class UserHero {
         return equipment.split(";");
     }
 
-    public void changeEquipment(int item, Long equipmentId) {
+    public void changeEquipment(int item, Long equipmentId, Item_table item_table) {
         String[] equip = equipment.split(";");
         if (!equip[item].equals("0")) {
             this.addToInventory(Long.valueOf(equip[item]));
@@ -101,6 +108,7 @@ public class UserHero {
         for (int i = 1; i < equip.length; i++) {
             equipment += ";" + equip[i];
         }
+        recalculateAttackAndArmor(item_table);
     }
 
     public int getMoney() {
@@ -218,4 +226,74 @@ public class UserHero {
         this.skills = skills;
     }
 
+    public int getLevel() {
+        return level;
+    }
+
+    public void setLevel(int level) {
+        this.level = level;
+    }
+
+    public int getExperience() {
+        return experience;
+    }
+
+    public void setExperience(int experience) {
+        this.experience = experience;
+    }
+
+    public void addExperience(int experience) {
+        this.experience += experience;
+        checkLevel();
+    }
+
+    public void checkLevel() {
+        if (experience >= getExperienceForNewLevel()) {
+            level++;
+            health = (level * 10) + "/" + (level * 10);
+            experience = experience - getExperienceForNewLevel();
+        }
+    }
+
+    public int getExperienceForNewLevel() {
+        return (int) Math.pow(level / 0.05, 1.5);
+    }
+
+    public int getArmor() {
+        return armor;
+    }
+
+    public void setArmor(int armor) {
+        this.armor = armor;
+    }
+
+    public int getMinAttack() {
+        return minAttack;
+    }
+
+    public int getMaxAttack() {
+        return maxAttack;
+    }
+
+    public int getCriticalChance() {
+        return criticalChance;
+    }
+
+    public void recalculateAttackAndArmor(Item_table item_table) {
+        armor = 0;
+        health = (level * 10) + "/" + (level * 10);
+        for (int i = 0; i < 4; i++) {
+            armor += item_table.findById(Long.valueOf(equipment.split(";")[i])).get().getValue()
+                    * item_table.findById(Long.valueOf(equipment.split(";")[5])).get().getItemLevel();
+        }
+        criticalChance = item_table.findById(Long.valueOf(equipment.split(";")[4])).get().getItemLevel();
+        if (!equipment.split(";")[5].equals("0")) {
+            minAttack = item_table.findById(Long.valueOf(equipment.split(";")[5])).get().getValue();
+            maxAttack = minAttack
+                    * (item_table.findById(Long.valueOf(equipment.split(";")[5])).get().getItemLevel() + 1);
+        } else {
+            minAttack = 0;
+            maxAttack = 5;
+        }
+    }
 }

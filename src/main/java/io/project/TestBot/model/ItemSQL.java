@@ -22,14 +22,17 @@ public class ItemSQL {
 
     private int itemLevel;
 
+    private int value;
+
     public ItemSQL() {
     }
 
-    public ItemSQL(Long itemId, String itemName, String itemType, int itemLevel) {
+    public ItemSQL(Long itemId, String itemName, String itemType, int itemLevel, int value) {
         this.itemId = itemId;
         this.itemName = itemName;
         this.itemType = itemType;
         this.itemLevel = itemLevel;
+        this.value = value;
     }
 
     public Long getItemId() {
@@ -61,11 +64,11 @@ public class ItemSQL {
     // стрелочка вверх "\u2B06"
     // стрелочка вниз "\u2B07"
     public String toString() {
-        return itemName + " lv." + itemLevel;
+        return itemName + " (" + value + ") lv." + itemLevel;
     }
 
     public String toStringWithType() {
-        return typeToEmoji() + " " + itemName + " lv." + itemLevel;
+        return typeToEmoji() + " " + itemName + " (" + value + ") lv." + itemLevel;
     }
 
     private String typeToEmoji() {
@@ -97,6 +100,14 @@ public class ItemSQL {
 
     public void setItemName(String itemName) {
         this.itemName = itemName;
+    }
+
+    public int getValue() {
+        return value;
+    }
+
+    public void setValue(int value) {
+        this.value = value;
     }
 
 }

@@ -20,7 +20,8 @@ public class SkillSQL {
 
     // скиллы пока только отнимают или повышают здоровье
 
-    // health + -
+    // damage
+    // heal
     private String skillEffect;
 
     private String skillDescription;
@@ -32,16 +33,22 @@ public class SkillSQL {
     @Column(length = 1000)
     private String[] skillPhrases;
 
+    private int minValue;
+
+    private int maxValue;
+
     public SkillSQL() {
     }
 
     public SkillSQL(Long skillId, String skillName, String skillDescription, String skillTarget, String skillEffect,
-            String[] skillPhrases) {
+            int minValue, int maxValue, String[] skillPhrases) {
         this.skillId = skillId;
         this.skillName = skillName;
         this.skillDescription = skillDescription;
         this.skillTarget = skillTarget;
         this.skillEffect = skillEffect;
+        this.minValue = minValue;
+        this.maxValue = maxValue;
         this.skillPhrases = skillPhrases;
     }
 
@@ -91,6 +98,14 @@ public class SkillSQL {
 
     public void setSkillPhrases(String[] skillPhrases) {
         this.skillPhrases = skillPhrases;
+    }
+
+    public int getMinValue() {
+        return minValue;
+    }
+
+    public int getMaxValue() {
+        return maxValue;
     }
 
 }
