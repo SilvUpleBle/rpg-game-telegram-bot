@@ -190,11 +190,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                         createTask(update.getMessage(), (byte) user.getStep());
                         break;
                     case "/edit_task":
-                        editTask(update.getMessage(), (byte) user.getStep());
+                        editTask(update.getMessage(), (byte) user.getStep(),
+                                Long.valueOf(user.getLastUserMessage()));
                         break;
-                    case "/delete_task":
-                        deleteTask(update.getMessage(), (byte) user.getStep());
-                        break;
+
                     case "/delete_user":
                         deleteUser(update.getMessage(), (byte) user.getStep());
                         break;
