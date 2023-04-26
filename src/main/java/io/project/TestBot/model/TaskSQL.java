@@ -27,6 +27,15 @@ public class TaskSQL {
     private Integer messageId;
 
     private Integer capacity;
+    private Boolean waitForAccept;
+
+    public Boolean getWaitForAccept() {
+        return waitForAccept;
+    }
+
+    public void setWaitForAccept(Boolean waitForAccept) {
+        this.waitForAccept = waitForAccept;
+    }
 
     public Integer getCapacity() {
         return capacity;
