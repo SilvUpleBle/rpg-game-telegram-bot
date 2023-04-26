@@ -21,6 +21,8 @@ public class UserState {
 
     private int idMenuMessage;
 
+    private Long battleId;
+
     public long getUserId() {
         return userId;
     }
@@ -79,6 +81,14 @@ public class UserState {
 
     public void setIdMenuMessage(int idMenuMessage) {
         this.idMenuMessage = idMenuMessage;
+    }
+
+    public Long getBattleId() {
+        return battleId;
+    }
+
+    public void setBattleId(Long battleId) {
+        this.battleId = battleId;
     }
 
 }
