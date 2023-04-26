@@ -2193,6 +2193,25 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     }
 
+    private void adminTasks(long userId) {
+        if (!user_table.findById(userId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Мои задачи", "/show_creators_tasks"));
+        list.get(1).add(new Pair<String, String>("Создать задачу", "/create_task"));
+        list.get(2).add(new Pair<String, String>("Назад", "/administration"));
+        editMessage(userId, "Меню администратора:", list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/administration");
+        user_state.save(userS);
+    }
+
     private void editTask(Message message, byte step, Long taskId) {
         UserState user = user_state.findById(message.getFrom().getId()).get();
         if (message.getChat().isUserChat()) {
