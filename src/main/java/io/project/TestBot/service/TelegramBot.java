@@ -185,10 +185,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/edit_task":
                         editTask(update.getMessage(), (byte) user.getStep(),
                                 Long.valueOf(user.getLastUserMessage()));
+
                         break;
-                    case "/delete_task":
-                        deleteTask(update.getMessage(), Long.valueOf(user.getLastUserMessage()));
-                        break;
+
                     case "/delete_user":
                         deleteUser(update.getMessage(), (byte) user.getStep());
                         break;
@@ -328,6 +327,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/administration", "/administration@tstbtstst_bot":
                             showAdministration(update.getMessage().getFrom().getId());
                             break;
+                        case "/dropAllPointsQuestion":
+                            dropAllPointsQuestion(update.getMessage().getFrom().getId());
+
+                            break;
+                        case "/dropAllPoints":
+
+                            dropAllPoints(update.getMessage().getFrom().getId());
+                            break;
                         case "/rating", "/rating@tstbtstst_bot":
                             showRating(update.getMessage().getFrom().getId());
                             break;
@@ -456,7 +463,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                                                 case "bar":
                                                     showUnderConstruct(update.getMessage().getFrom().getId(),
-                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                            new Pair<String, String>("Назад", "/travelTo town"));
                                                     break;
                                                 case "hospital":
                                                     if (update.getMessage().getText().split(" ").length == 3) {
@@ -485,7 +492,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                     break;
                                                 case "library":
                                                     showUnderConstruct(update.getMessage().getFrom().getId(),
-                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                            new Pair<String, String>("Назад", "/travelTo town"));
                                                     break;
                                                 default:
                                                     break;
@@ -961,7 +968,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
         list.get(0).add(new Pair<String, String>(
-                "Поменять ассортимент в продаже 🎰", "/travelTo town shop roll"));
+                "Поменять ассортимент в продаже за 10 монет 🎰", "/travelTo town shop roll"));
         list.get(1).add(new Pair<String, String>(
                 "Показать товары 🧳", "/travelTo town shop show"));
         list.get(2).add(new Pair<String, String>(
@@ -987,7 +994,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 item = item_table.findByItemId(Long.parseLong(shop.getItemId()[k]));
                 k++;
                 list.get(i).add(new Pair<String, String>(
-                        item.toStringWithType(), "/travelTo town shop show " + item.getItemId()));
+                        item.toStringWithType() + " " + String.valueOf((5 + item.getItemLevel() * 10)) + " злотых",
+                        "/travelTo town shop show " + item.getItemId()));
             }
         }
 
@@ -1094,7 +1102,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 list.add(new ArrayList<>());
                 ItemSQL item = item_table.findByItemId(Long.parseLong(itemsId[i]));
                 list.get(i).add(new Pair<String, String>(
-                        item.toStringWithType(),
+                        item.toStringWithType() + " " + String.valueOf((5 + item.getItemLevel() * 8)) + " злотых",
                         "/travelTo town shop sell " + itemsId[i]));
             }
             i++;
@@ -1845,6 +1853,14 @@ public class TelegramBot extends TelegramLongPollingBot {
         sendMessage(userId, "Задание не принято");// TODO заменить на edit
     }
 
+    private void dropAllPointsQuestion(long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Да✅", "/dropAllPoints"));
+        list.get(0).add(new Pair<String, String>("Нет🚫", "/administration"));
+        sendMessageWithInlineButtons(userId, "Вы уверены?", list);
+    }
+
     private void showAdministration(long userId) {
         if (!user_table.findById(userId).get().isAdmin()) {
             sendMessage(userId, "Вы не обладаете правами администратора!");
@@ -1855,7 +1871,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
         list.get(0).add(new Pair<String, String>("Пользователи👥", "/showUsers"));
-        list.get(1).add(new Pair<String, String>("Сбросить очки🗑", "/dropAllPoints"));
+        list.get(1).add(new Pair<String, String>("Сбросить очки🗑", "/dropAllPointsQuestion"));
         list.get(1).add(new Pair<String, String>("Задачи💼", "/adminTasks"));
         list.get(2).add(new Pair<String, String>("Назад", "/menu"));
         editMenuMessage(userId, "Меню администратора:", list);
@@ -1898,6 +1914,16 @@ public class TelegramBot extends TelegramLongPollingBot {
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/rating");
         user_state.save(userS);
+    }
+
+    private void dropAllPoints(Long adminId) {
+        UserSQL admin = user_table.findByUserId(adminId);
+        Iterable<UserSQL> users = user_table.findAll();
+        for (UserSQL user : users) {
+            user.setPoints(0);
+            user_table.save(user);
+        }
+        sendMessage(admin.getChatId(), "Все очки сброшены!");
     }
 
     private void showUnderConstruct(Long userId, Pair<String, String> pair) {
@@ -2023,39 +2049,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         user_state.save(userS);
     }
 
-    private void showCreatorsTasks(Long userId) {
-
-        List<List<Pair<String, String>>> list = new ArrayList<>();
-
-        List<TaskSQL> taskList = new ArrayList<>();
-        taskList = task_table.findAllByCreatorId(userId);
-        for (int i = 0; i < taskList.size(); i++) {
-            list.add(new ArrayList<>());
-            list.get(i).add(new Pair<String, String>(taskList.get(i).getTaskName(),
-                    "/showAdminTask " + taskList.get(i).getTaskId()));
-        }
-        list.add(new ArrayList<>());
-        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/adminTasks"));
-
-        editMessage(userId, "Список заданий", list);
-    }
-
-    private void showAdminTask(Long userId, Long taskId) {
-        TaskSQL task = task_table.findByTaskId(taskId);
-        List<List<Pair<String, String>>> list = new ArrayList<>();
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.get(0).add(new Pair<String, String>("Изменить задание",
-                "/edit_task " + taskId));
-        list.get(1).add(new Pair<String, String>("Удалить задание",
-                "/delete_task " + taskId));
-        list.get(2).add(new Pair<String, String>("Назад",
-                "/show_creators_tasks"));
-        editMessage(userId, "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
-                + "Награда: " + task.getPoints() + "\n" + "Дата начала: " + task.getDateStart() + "\n" + "Дата конца: "
-                + task.getDateEnd(), list);
-    }
     //
     // НАЧАЛО БЛОКА СЛУЖБНЫХ КОМАНД
     //
@@ -2148,31 +2141,44 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user_state.save(user);
                             break;
                         case 7:
-                            user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
-                            desc = user.getLastUserMessage().split(";");
+                            try {
+                                Integer.parseInt(message.getText());
+                                user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
+                                desc = user.getLastUserMessage().split(";");
 
-                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
-                                    .formatted(desc[2]), new String[][] { { "Да", "Нет" } });
-                            user.setWaitForRequest(true);
-                            user.setStep((byte) 8);
-                            user_state.save(user);
+                                sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
+                                        .formatted(desc[2]), new String[][] { { "Да", "Нет" } });
+                                user.setWaitForRequest(true);
+                                user.setStep((byte) 8);
+                                user_state.save(user);
+                            } catch (Exception e) {
+                                sendMessage(message.getFrom().getId(), "Вводите целые числа\n Начнем создание заново!");
+                                createTask(message, (byte) 2);
+                            }
+
                             break;
                         case 8:
                             sendMessage(message.getFrom().getId(),
-                                    "Введите колличество человек для этого задания!");
+                                    "Введите количество человек для этого задания!");
                             user.setWaitForRequest(true);
                             user.setStep((byte) 9);
                             user_state.save(user);
                             break;
                         case 9:
-                            user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
-                            desc = user.getLastUserMessage().split(";");
+                            try {
+                                user.setLastUserMessage(user.getLastUserMessage() + ";" + message.getText());
+                                desc = user.getLastUserMessage().split(";");
 
-                            sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
-                                    .formatted(desc[3]), new String[][] { { "Да", "Нет" } });
-                            user.setWaitForRequest(true);
-                            user.setStep((byte) 10);
-                            user_state.save(user);
+                                sendMessage(message.getFrom().getId(), "Проверьте, все так? <b><i>%s</i></b>!"
+                                        .formatted(desc[3]), new String[][] { { "Да", "Нет" } });
+                                user.setWaitForRequest(true);
+                                user.setStep((byte) 10);
+                                user_state.save(user);
+                            } catch (Exception e) {
+                                sendMessage(message.getFrom().getId(), "Вводите целые числа\n Начнем создание заново!");
+                                createTask(message, (byte) 2);
+                            }
+
                             break;
                         case 10:
                             sendMessage(message.getFrom().getId(),
@@ -2228,7 +2234,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                     + task.getTaskDescription() + "\n"
                                                     + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
                                                     + task.getDateStart() + "\n" + "Дата конца: "
-                                                    + task.getDateEnd() + "\n" + "Колличество людей взявших задание: 0/"
+                                                    + task.getDateEnd() + "\n" + "Количество людей взявших задание: 0/"
                                                     + task.getCapacity(),
                                             task.getTaskId(), list);
                                     break;
@@ -2268,24 +2274,31 @@ public class TelegramBot extends TelegramLongPollingBot {
         UserSQL user = user_table.findById(message.getFrom().getId()).get();
         String[] arr;
         if (task.getRecipientId() == null) {
-            task.addRecipientId(String.valueOf(message.getFrom().getId()));
-            user.addActiveTask(taskId);
-            user_table.save(user);
-            task_table.save(task);
-            arr = task.getRecipientId().split(";");
+            if (task.getCapacity().equals(1)) {
+                editMessage(message.getChatId(), "Задание: " + task.getTaskName() + " полностью разобрано!",
+                        taskId);
 
-            List<List<Pair<String, String>>> list = new ArrayList<>();
-            list.add(new ArrayList<>());
-            list.get(0).add(
-                    new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
-            editMessage(message.getChatId(), "Задание: " + task.getTaskName() + "\n" + "Описание: "
-                    + task.getTaskDescription() + "\n"
-                    + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
-                    + task.getDateStart() + "\n" + "Дата конца: "
-                    + task.getDateEnd() + "\n" + "Колличество людей взявших задание: " + arr.length + "/"
-                    + task.getCapacity(), list, taskId);
+            } else {
+                task.addRecipientId(String.valueOf(message.getFrom().getId()));
+                user.addActiveTask(taskId);
+                user_table.save(user);
+                task_table.save(task);
+                arr = task.getRecipientId().split(";");
 
-            sendMessage(user.getUserId(), "Вы взяли задание: " + task.getTaskName());
+                List<List<Pair<String, String>>> list = new ArrayList<>();
+                list.add(new ArrayList<>());
+                list.get(0).add(
+                        new Pair<String, String>("Принять", "/task_agree " + task.getTaskId()));
+                editMessage(message.getChatId(), "Задание: " + task.getTaskName() + "\n" + "Описание: "
+                        + task.getTaskDescription() + "\n"
+                        + "Награда: " + task.getPoints() + "\n" + "Дата начала: "
+                        + task.getDateStart() + "\n" + "Дата конца: "
+                        + task.getDateEnd() + "\n" + "Колличество людей взявших задание: " + arr.length + "/"
+                        + task.getCapacity(), list, taskId);
+
+                sendMessage(user.getUserId(), "Вы взяли задание: " + task.getTaskName());
+            }
+
         } else {
             arr = task.getRecipientId().split(";");
             boolean fl = false;
@@ -2323,6 +2336,40 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         }
 
+    }
+
+    private void showCreatorsTasks(Long userId) {
+
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+
+        List<TaskSQL> taskList = new ArrayList<>();
+        taskList = task_table.findAllByCreatorId(userId);
+        for (int i = 0; i < taskList.size(); i++) {
+            list.add(new ArrayList<>());
+            list.get(i).add(new Pair<String, String>(taskList.get(i).getTaskName(),
+                    "/showAdminTask " + taskList.get(i).getTaskId()));
+        }
+        list.add(new ArrayList<>());
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/adminTasks"));
+
+        editMessage(userId, "Список заданий", list);
+    }
+
+    private void showAdminTask(Long userId, Long taskId) {
+        TaskSQL task = task_table.findByTaskId(taskId);
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Изменить задание",
+                "/edit_task " + taskId));
+        list.get(1).add(new Pair<String, String>("Удалить задание",
+                "/delete_task " + taskId));
+        list.get(2).add(new Pair<String, String>("Назад",
+                "/show_creators_tasks"));
+        editMessage(userId, "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
+                + "Награда: " + task.getPoints() + "\n" + "Дата начала: " + task.getDateStart() + "\n" + "Дата конца: "
+                + task.getDateEnd(), list);
     }
 
     private void editTask(Message message, byte step, Long taskId) {
@@ -2386,13 +2433,19 @@ public class TelegramBot extends TelegramLongPollingBot {
                             adminTasks(message.getFrom().getId());
                             break;
                         case 53:
-                            task = task_table.findByTaskId(taskId);
-                            task.setPoints(Integer.parseInt(message.getText()));
-                            task_table.save(task);
-                            user.setProcess(null);
-                            user_state.save(user);
-                            sendMessage(message.getChatId(), "Изменение завершено!");
-                            adminTasks(message.getFrom().getId());
+                            try {
+                                task = task_table.findByTaskId(taskId);
+                                task.setPoints(Integer.parseInt(message.getText()));
+                                task_table.save(task);
+                                user.setProcess(null);
+                                user_state.save(user);
+                                sendMessage(message.getChatId(), "Изменение завершено!");
+                                adminTasks(message.getFrom().getId());
+                            } catch (Exception e) {
+                                sendMessage(message.getFrom().getId(), "Вводите целые числа\n Начнем создание заново!");
+                                editTask(message, (byte) 1, taskId);
+                            }
+
                             break;
 
                         default:
