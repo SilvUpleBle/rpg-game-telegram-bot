@@ -21,17 +21,10 @@ import io.project.TestBot.model.Task_table;
 import io.project.TestBot.model.UserHero;
 import io.project.TestBot.model.User_table;
 
-import java.io.File;
-import java.sql.Date;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -2527,6 +2520,37 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void editMessage(long chatId, String newMessage, List<List<Pair<String, String>>> buttons, Long taskId) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(task_table.findById(taskId).get().getMessageId());
+        editMessageText.setText(newMessage);
+        editMessageText.setReplyMarkup(createInlineKeyboard(buttons));
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void editMessage(long chatId, String newMessage, Long taskId) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(task_table.findById(taskId).get().getMessageId());
+        editMessageText.setText(newMessage);
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
     private void deleteLastMessage(long chatId) {
         DeleteMessage deleteMessage = new DeleteMessage(String.valueOf(chatId),
                 user_state.findById(chatId).get().getIdLastBotMessage());
@@ -2617,6 +2641,25 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         inlineKeyboardMarkup.setKeyboard(rowList);
         return inlineKeyboardMarkup;
+    }
+
+    private void sendMessageWithLastMessageId(long chatId, String textToSend, Long taskId,
+            List<List<Pair<String, String>>> buttons) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+        message.enableHtml(true);
+        message.setReplyMarkup(createInlineKeyboard(buttons));
+
+        try {
+            Message msg = execute(message);
+            TaskSQL task = task_table.findByTaskId(taskId);
+            task.setMessageId(msg.getMessageId());
+            task_table.save(task);
+
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
     }
 
     private void sendMessageWithPicture(long chatId, String textToSend, String imageUrlToSend) {
