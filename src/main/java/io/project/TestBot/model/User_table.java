@@ -8,4 +8,6 @@ public interface User_table extends CrudRepository<UserSQL, Long> {
 
     List<UserSQL> findAllByChatId(Long chatId);
 
+    UserSQL findByUserId(long userId);
+
 }

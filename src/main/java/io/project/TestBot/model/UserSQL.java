@@ -1,5 +1,9 @@
 package io.project.TestBot.model;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 
@@ -21,7 +25,7 @@ public class UserSQL implements Comparable<UserSQL> {
 
     private int points;
 
-    private String activeTasks;
+    private String activeTasks = "";
 
     public long getUserId() {
         return userId;
@@ -105,15 +109,28 @@ public class UserSQL implements Comparable<UserSQL> {
         return allActiveTasksId;
     }
 
+    public void deleteTask(Long taskId) {
+        List<String> allActiveTasksId = new ArrayList<>(Arrays.asList(activeTasks.split(";")));
+        allActiveTasksId.remove(String.valueOf(taskId));
+        if (!allActiveTasksId.isEmpty()) {
+            activeTasks = allActiveTasksId.get(0);
+            for (int i = 1; i < allActiveTasksId.size(); i++) {
+                activeTasks += ";" + allActiveTasksId.get(i);
+            }
+        } else {
+            activeTasks = "";
+        }
+    }
+
     public void setActiveTasks(String activeTasks) {
         this.activeTasks = activeTasks;
     }
 
-    public void addActiveTasks(String activeTasks) {
-        if (this.activeTasks == null) {
-            this.activeTasks = activeTasks;
+    public void addActiveTask(Long taskId) {
+        if (activeTasks == null || activeTasks.equals("")) {
+            activeTasks = String.valueOf(taskId);
         } else {
-            this.activeTasks += ";%s".formatted(activeTasks);
+            activeTasks += ";" + taskId;
         }
     }
 
