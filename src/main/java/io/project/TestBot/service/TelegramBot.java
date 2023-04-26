@@ -207,6 +207,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         changeHeroName(update.getMessage().getFrom().getId());
                         break;
                     case "/battle":
+                        BattleSQL battle = battle_table.findById(user.getBattleId()).get();
                         switch (messageText) {
                             case "/showFirstBattleMessage":
                                 showFirstBattleMessage(user.getUserId());
@@ -218,7 +219,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                                 break;
                             case "/useAttack":
-
+                                useAttack(user.getUserId(), Long.valueOf(update.getMessage().getText().split(" ")[1]));
                                 break;
                             default:
                                 break;
@@ -767,10 +768,10 @@ public class TelegramBot extends TelegramLongPollingBot {
             hero = user_hero.findById(id).get();
 
             if (id.equals(userId)) {
-                textToSend += "<b>%s (%s) - %s❤️</b>\n".formatted(hero.getHeroName(), user.getUserName(),
+                textToSend += "<b>%s (%s) \u2014 %s❤️</b>\n".formatted(hero.getHeroName(), user.getUserName(),
                         hero.getHealth());
             } else {
-                textToSend += "%s (%s) - %s❤️\n".formatted(hero.getHeroName(), user.getUserName(),
+                textToSend += "%s (%s) \u2014 %s❤️\n".formatted(hero.getHeroName(), user.getUserName(),
                         hero.getHealth());
             }
         }
@@ -779,7 +780,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         for (Long id : battle.getSecondSideIds()) {
             user = user_table.findById(id).get();
             hero = user_hero.findById(id).get();
-            textToSend += "%s (%s) - %s❤️\n".formatted(hero.getHeroName(), user.getUserName(),
+            textToSend += "%s (%s) \u2014 %s❤️\n".formatted(hero.getHeroName(), user.getUserName(),
                     hero.getHealth());
         }
 
@@ -787,13 +788,17 @@ public class TelegramBot extends TelegramLongPollingBot {
             List<List<Pair<String, String>>> list = new ArrayList<>();
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
-            list.get(0).add(new Pair<String, String>("Атаковать", "/useAttack"));
+            list.get(0).add(new Pair<String, String>("Атаковать", "/useAttack " + battle.getSecondSideIds()[0]));
             list.get(0).add(new Pair<String, String>("Способность", "/showHeroSkillsInBattle"));
             list.get(1).add(new Pair<String, String>("Сдаться", "/giveUp"));
             sendMenuMessage(userId, textToSend, list);
         } else {
             sendMenuMessage(userId, textToSend);
         }
+    }
+
+    private void showBattleMessage(Long userId) {
+
     }
 
     private void showHeroSkillsInBattle(Long userId) {
@@ -810,14 +815,48 @@ public class TelegramBot extends TelegramLongPollingBot {
         editMenuMessage(userId, "Способности героя:", list);
     }
 
-    private void useAttack(Long userId) {
+    private void useAttack(Long userId, Long enemyId) {
+        UserHero hero = user_hero.findById(userId).get();
+        UserHero enemy = user_hero.findById(enemyId).get();
+        int attack = ThreadLocalRandom.current().nextInt(hero.getMinAttack(), hero.getMaxAttack() + 1);
+        enemy.setCurrentHealth(Integer.valueOf(enemy.getCurrentHealth()) - (attack - enemy.getArmor()));
+        String textToSend = "<b>%s</b> нанёс <b>%d (%d(атака) - %d(защита))</b> урона <b>%s</b>, используя <b>%s</b>!"
+                .formatted(hero.getHeroName(), attack - enemy.getArmor(), attack, enemy.getArmor(), enemy.getHeroName(),
+                        hero.getEquipment()[5].equals("0") ? "кулаки"
+                                : item_table.findById(Long.valueOf(hero.getEquipment()[5])).get().toStringWithType());
+        sendMessage(userId, textToSend);
+        sendMessage(enemyId, textToSend);
+        if (enemy.getCurrentHealth() >= 0) {
+            user_hero.save(enemy);
+            UserState user = user_state.findById(userId).get();
+            user.setWaitForRequest(false);
+            UserState enemyUser = user_state.findById(enemyId).get();
+            enemyUser.setWaitForRequest(true);
+            user_state.save(user);
+            user_state.save(enemyUser);
+            showFirstBattleMessage(userId);
+            showFirstBattleMessage(enemyId);
+        } else {
+            textToSend = "Поединок окончен! Победил <b>%s</b>!".formatted(hero.getHeroName());
+            sendMessage(userId, textToSend);
+            sendMessage(enemyId, textToSend);
+            hero.setCurrentHealth(hero.getMaxHealth());
+            enemy.setCurrentHealth(enemy.getMaxHealth());
+            user_hero.save(hero);
+            user_hero.save(enemy);
+        }
+    }
+
+    private void useSkill(Long userId, Long skillId, Long enemyId) {
+        SkillSQL skill = skill_table.findById(skillId).get();
+        UserHero hero = user_hero.findById(userId).get();
+        UserHero enemy = user_hero.findById(enemyId).get();
+        BattleSQL battle = battle_table.findById(user_state.findById(userId).get().getBattleId()).get();
 
     }
 
-    private void useSkill(Long userId, Long skillId) {
-        SkillSQL skill = skill_table.findById(skillId).get();
-        UserHero hero = user_hero.findById(userId).get();
-        BattleSQL battle = battle_table.findById(user_state.findById(userId).get().getBattleId()).get();
+    // TODO сделать универсальную проверку
+    private void checkHeroesState(BattleSQL battle) {
 
     }
 
@@ -934,6 +973,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void showProduct(long userId) {
         UserHero hero = user_hero.findByUserId(userId).get();
+        if (shop_table.findById(userId).isEmpty()) {
+            shopGenerator(userId);
+        }
         ShopSQL shop = shop_table.findByShopId(userId);
         ItemSQL item = new ItemSQL();
         List<List<Pair<String, String>>> list = new ArrayList<>();
@@ -982,7 +1024,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                     "Товар стоит " + price + " слишком бедны (˚ ˃̣̣̥⌓˂̣̣̥ )",
                     list);
         }
-
     }
 
     private void shopGenerator(long userId) {
@@ -1647,9 +1688,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         List<List<Pair<String, String>>> list = new ArrayList<>();
 
         List<TaskSQL> taskList = new ArrayList<>();
-        if (user_table.findById(userId).get().getActiveTasks() == null) {
-
-        } else {
+        if (!user_table.findById(userId).get().getActiveTasks().equals("")) {
             String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
             for (int i = 0; i < taskId.length; i++) {
                 TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
