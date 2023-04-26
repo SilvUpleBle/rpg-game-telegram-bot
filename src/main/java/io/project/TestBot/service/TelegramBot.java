@@ -1308,7 +1308,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         } else {
             String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
-            for (int i = 1; i < taskId.length; i++) {
+            for (int i = 0; i < taskId.length; i++) {
                 TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
                 taskList.add(task);
             }
@@ -1394,7 +1394,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     "Задание успешно сдано\n Вы получили: " + task.getPoints() + " очков пользователя!");// TODO
                                                                                                          // Придумать
                                                                                                          // нормальное
-                                                                                                         // название
+            log.info("id задачи = " + taskId); // название
             user.deleteTask(taskId);
             user_table.save(user);
         }
@@ -1845,7 +1845,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         String[] arr;
         if (task.getRecipientId() == null) {
             task.addRecipientId(String.valueOf(message.getFrom().getId()));
-            user.addActiveTasks(String.valueOf(taskId));
+            user.addActiveTask(taskId);
             user_table.save(user);
             task_table.save(task);
             arr = task.getRecipientId().split(";");
@@ -1873,7 +1873,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
             if (!fl) {
                 task.addRecipientId(String.valueOf(message.getFrom().getId()));
-                user.addActiveTasks(String.valueOf(taskId));
+                user.addActiveTask(taskId);
                 user_table.save(user);
                 task_table.save(task);
                 List<List<Pair<String, String>>> list = new ArrayList<>();
