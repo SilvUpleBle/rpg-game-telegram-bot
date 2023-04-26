@@ -2478,6 +2478,22 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    private void editMessage(long chatId, String newMessage, List<List<Pair<String, String>>> buttons, Long taskId) {
+        EditMessageText editMessageText = new EditMessageText();
+        editMessageText.setChatId(String.valueOf(chatId));
+        editMessageText.setMessageId(task_table.findById(taskId).get().getMessageId());
+        editMessageText.setText(newMessage);
+        editMessageText.setReplyMarkup(createInlineKeyboard(buttons));
+        editMessageText.enableHtml(true);
+
+        try {
+            execute(editMessageText);
+
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
     private void editMessage(long chatId, String newMessage, List<List<Pair<String, String>>> buttons) {
         EditMessageText editMessageText = new EditMessageText();
         editMessageText.setChatId(String.valueOf(chatId));
