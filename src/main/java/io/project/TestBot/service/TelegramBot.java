@@ -1651,13 +1651,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void showTasksList(long userId) {
         List<List<Pair<String, String>>> list = new ArrayList<>();
-        UserSQL user = user_table.findById(userId).get();
-        List<Long> tasksId = getIdsFromString(user.getActiveTasks(), ";");
-        String textToSend = "Ваши задачи:";
-        if (tasksId.isEmpty()) {
-            textToSend += "\n\nУ Вас нет активных задач!";
-        } else {
 
+        List<TaskSQL> taskList = new ArrayList<>();
+        if (user_table.findById(userId).get().getActiveTasks() == null) {
+
+        } else {
             String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
             for (int i = 0; i < taskId.length; i++) {
                 TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
@@ -1665,15 +1663,15 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
             for (int i = 0; i < taskList.size(); i++) {
                 list.add(new ArrayList<>());
-                list.get(i).add(new Pair<String, String>(task_table.findById(tasksId.get(i)).get().getTaskName(),
-                        "/getTask " + tasksId.get(i)));
+                list.get(i).add(new Pair<String, String>(taskList.get(i).getTaskName(),
+                        "/user_tasks " + taskList.get(i).getTaskId()));
             }
         }
 
         list.add(new ArrayList<>());
-        list.get(tasksId.size()).add(new Pair<String, String>("Назад", "/menu"));
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/menu"));
 
-        editMenuMessage(userId, textToSend, list);
+        editMessage(userId, "Список заданий", list);
 
         UserState userS = user_state.findById(userId).get();
         userS.setLastUserMessage("/tasks");
