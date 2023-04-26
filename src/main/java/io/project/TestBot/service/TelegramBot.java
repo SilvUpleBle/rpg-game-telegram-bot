@@ -185,6 +185,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/edit_task":
                         editTask(update.getMessage(), (byte) user.getStep(),
                                 Long.valueOf(user.getLastUserMessage()));
+
                         break;
 
                     case "/delete_user":
@@ -1699,9 +1700,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         List<List<Pair<String, String>>> list = new ArrayList<>();
 
         List<TaskSQL> taskList = new ArrayList<>();
-        if (user_table.findById(userId).get().getActiveTasks() == null) {
-
-        } else {
+        if (!user_table.findById(userId).get().getActiveTasks().equals("")) {
             String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
             for (int i = 0; i < taskId.length; i++) {
                 TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
@@ -1986,6 +1985,25 @@ public class TelegramBot extends TelegramLongPollingBot {
         user_hero.save(hero);
 
         sendMessage(userId, "Вы получили предмет <b>%s</b>!".formatted(item_table.findById(itemId).get().toString()));
+    }
+
+    private void adminTasks(long userId) {
+        if (!user_table.findById(userId).get().isAdmin()) {
+            sendMessage(userId, "Вы не обладаете правами администратора!");
+            return;
+        }
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(0).add(new Pair<String, String>("Мои задачи", "/show_creators_tasks"));
+        list.get(1).add(new Pair<String, String>("Создать задачу", "/create_task"));
+        list.get(2).add(new Pair<String, String>("Назад", "/administration"));
+        editMessage(userId, "Меню администратора:", list);
+
+        UserState userS = user_state.findById(userId).get();
+        userS.setLastUserMessage("/administration");
+        user_state.save(userS);
     }
 
     //
@@ -2309,25 +2327,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         editMessage(userId, "Задание: " + task.getTaskName() + "\n" + "Описание: " + task.getTaskDescription() + "\n"
                 + "Награда: " + task.getPoints() + "\n" + "Дата начала: " + task.getDateStart() + "\n" + "Дата конца: "
                 + task.getDateEnd(), list);
-    }
-
-    private void adminTasks(long userId) {
-        if (!user_table.findById(userId).get().isAdmin()) {
-            sendMessage(userId, "Вы не обладаете правами администратора!");
-            return;
-        }
-        List<List<Pair<String, String>>> list = new ArrayList<>();
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.add(new ArrayList<>());
-        list.get(0).add(new Pair<String, String>("Мои задачи", "/show_creators_tasks"));
-        list.get(1).add(new Pair<String, String>("Создать задачу", "/create_task"));
-        list.get(2).add(new Pair<String, String>("Назад", "/administration"));
-        editMessage(userId, "Меню администратора:", list);
-
-        UserState userS = user_state.findById(userId).get();
-        userS.setLastUserMessage("/administration");
-        user_state.save(userS);
     }
 
     private void editTask(Message message, byte step, Long taskId) {
