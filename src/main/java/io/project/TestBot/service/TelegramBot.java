@@ -120,7 +120,13 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        if (update.hasMessage() && update.getMessage().hasPhoto()) {
+            UserState user = user_state.findByUserId(update.getMessage().getFrom().getId());
+            if (user.getProcess().equals("/submit_task_by_user")) {
+                submitTaskByUser(update.getMessage(), (byte) user.getStep(), Long.parseLong(user.getLastUserMessage()));
+            }
 
+        }
         if (update.hasCallbackQuery()) {
             log.info("callBackData = %s".formatted(update.getCallbackQuery().getData()));
             Message newMessage = new Message();
@@ -177,17 +183,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                         editTask(update.getMessage(), (byte) user.getStep(),
                                 Long.valueOf(user.getLastUserMessage()));
                         break;
-                    case "/submit_task_by_user":
-                        editTask(update.getMessage(), (byte) user.getStep(),
-                                Long.valueOf(user.getLastUserMessage()));
-                        break;
-
                     case "/delete_user":
                         deleteUser(update.getMessage(), (byte) user.getStep());
                         break;
                     case "/delete_hero":
                         deleteHero(update.getMessage(), (byte) user.getStep());
                         break;
+
                     case "/createGroup":
                         user.setLastUserMessage(update.getMessage().getText());
                         user_state.save(user);
@@ -287,16 +289,16 @@ public class TelegramBot extends TelegramLongPollingBot {
                         case "/submit_task_by_user", "/submit_task_by_user@tstbtstst_bot":
                             user.setProcess("/submit_task_by_user");
                             user_state.save(user);
-                            submitTaskByUser(update.getMessage(),
-                                    Long.valueOf(update.getMessage().getText().split(" ")[1]), (byte) 1);
+                            submitTaskByUser(update.getMessage(), (byte) 1,
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/submitTaskByAdmin", "/submitTaskByAdmin@tstbtstst_bot":
-                            submitTaskByAdmin(update.getMessage().getFrom().getId(),
+                            submitTaskByAdmin(update.getMessage(),
                                     Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
                         case "/rejectTask", "/rejectTask@tstbtstst_bot":
-                            // rejectTask(update.getMessage().getFrom().getId(),
-                            // Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            rejectTask(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
                             break;
 
                         case "/administration", "/administration@tstbtstst_bot":
@@ -1341,93 +1343,77 @@ public class TelegramBot extends TelegramLongPollingBot {
                 + task.getDateEnd(), list);
     }
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /*
-     * switch (step) {
-     * case 1:
-     * task = task_table.findByTaskId(taskId);
-     * sendMessage(message.getChatId(), "Напишите что вы хотите изменить",
-     * new String[][] { { "Название", "Описание", "Награда" } });
-     * user.setWaitForRequest(true);
-     * user.setStep((byte) 2);
-     * user_state.save(user);
-     * 
-     * break;
-     * case 2:
-     * switch (message.getText()) {
-     * case "Название", "название":
-     * sendMessage(message.getChatId(), "Введите новое название");
-     * user.setWaitForRequest(true);
-     * user.setStep((byte) 51);
-     * user_state.save(user);
-     * break;
-     * case "Описание", "описание":
-     * sendMessage(message.getChatId(), "Введите новое описание");
-     * user.setWaitForRequest(true);
-     * user.setStep((byte) 52);
-     * user_state.save(user);
-     * break;
-     * case "Награда", "награда":
-     * sendMessage(message.getChatId(), "Введите новую награду");
-     * user.setWaitForRequest(true);
-     * user.setStep((byte) 53);
-     * user_state.save(user);
-     * break;
-     * default:
-     * break;
-     */
-    private void submitTaskByUser(Message message, Long taskId, byte step) {
+    private void submitTaskByUser(Message message, byte step, long taskId) {
         TaskSQL task = task_table.findByTaskId(taskId);
         UserState user = user_state.findByUserId(message.getFrom().getId());
+
         switch (step) {
             case 1:
-                sendMessage(message.getFrom().getId(), "Отправьте сообщение с фотографией работы и описанием её.");
+                sendMessage(message.getFrom().getId(), "Отправьте фото выполненного задания");
+                user.setLastUserMessage(String.valueOf(taskId));
                 user.setWaitForRequest(true);
                 user.setStep((byte) 2);
                 user_state.save(user);
                 break;
             case 2:
-                sendMessage(message.getFrom().getId(), "case 2");
-                sendMessageWithPhoto(message, message.getText());
 
+                List<List<Pair<String, String>>> list = new ArrayList<>();
+                list.add(new ArrayList<>());
+                list.add(new ArrayList<>());
+                list.get(0).add(new Pair<String, String>("Принять задание",
+                        "/submitTaskByAdmin " + taskId));
+                list.get(1).add(new Pair<String, String>("Отказать",
+                        "/rejectTask " + taskId));
+                sendMessageWithPhotoAndInlineKB(message, task.getCreatorId(),
+                        "Задание" + ": " + task.getTaskName() + "\n" + "Описание" + ": " + task.getTaskDescription(),
+                        list);
+
+                sendMessage(message.getFrom().getId(), "Отправлено на обработку");
+                task.setWaitForAccept(true);
+                user.setProcess(null);
+
+                user_state.save(user);
+                task_table.save(task);
+                cancel(message.getFrom().getId());
                 break;
         }
-        /*
-         * List<List<Pair<String, String>>> list = new ArrayList<>();
-         * list.add(new ArrayList<>());
-         * list.add(new ArrayList<>());
-         * list.get(0).add(new Pair<String, String>("Принять задание",
-         * "//submitTaskByAdmin " + taskId));
-         * list.get(1).add(new Pair<String, String>("Отказать",
-         * "/rejectTask " + taskId));
-         * sendMessageWithInlineButtons(task.getCreatorId(),
-         * "Задание: " + task.getTaskName() + "\n" + "Описание: " +
-         * task.getTaskDescription() + "\n"
-         * + " Принять задание?",
-         * list);
-         */
+
     }
 
-    private void sendMessageWithPhoto(Message message, String textToSend) {
-        long chat_id = message.getFrom().getId();
-        List<PhotoSize> photos = message.getPhoto();
-        log.info(photos.get(0).getFileId());
-        SendPhoto msg = new SendPhoto();
-
-        msg.setChatId(String.valueOf(chat_id));
-        msg.setPhoto(new InputFile(photos.get(0).getFileId()));
-        msg.setCaption(textToSend);
-        try {
-            execute(msg);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void submitTaskByAdmin(Long userId, Long taskId) {
+    private void submitTaskByAdmin(Message message, Long taskId) {
         TaskSQL task = task_table.findByTaskId(taskId);
-        List<UserSQL> users;
+        String[] usersId = task.getAllRecipientId();
+        List<UserSQL> users = new ArrayList<>();
+        for (int i = 0; i < usersId.length; i++) {
+            UserSQL user = user_table.findByUserId(Long.parseLong(usersId[i]));
+            users.add(user);
+        }
+        for (UserSQL user : users) {
+            user.setPoints(user.getPoints() + task.getPoints());
+            sendMessage(user.getUserId(),
+                    "Задание успешно сдано\n Вы получили: " + task.getPoints() + " очков пользователя!");// TODO
+                                                                                                         // Придумать
+                                                                                                         // нормальное
+                                                                                                         // название
+            user.deleteTask(taskId);
+            user_table.save(user);
+        }
 
+        sendMessage(message.getFrom().getId(), "Задание закрыто!");
+        deleteTask(message, taskId);
+    }
+
+    private void rejectTask(Long userId, Long taskId) {
+        UserState user = user_state.findByUserId(userId);
+        user.setIdLastBotMessage(0);
+        TaskSQL task = task_table.findByTaskId(taskId);
+        task.setWaitForAccept(null);
+        task_table.save(task);
+        String[] recId = task.getAllRecipientId();
+        for (int i = 0; i < recId.length; i++) {
+            sendMessage(Long.parseLong(recId[i]), "Задание не принято");
+        }
+        sendMessage(userId, "Задание не принято");// TODO заменить на edit
     }
 
     private void showAdministration(long userId) {
@@ -2014,7 +2000,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                     task = task_table.findByTaskId(taskId);
                     task_table.delete(task);
-                    editMessage(message.getChatId(), "Удаление завершено!");
+                    editMessage(message.getChatId(), "Задание удалено");
                     adminTasks(message.getFrom().getId());
 
                 } else {
@@ -2363,6 +2349,38 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         } catch (TelegramApiException e) {
             log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void sendMessageWithPhoto(Message message, long receiverId, String textToSend) {
+        List<PhotoSize> photos = message.getPhoto();
+        log.info(photos.get(0).getFileId());
+        SendPhoto msg = new SendPhoto();
+
+        msg.setChatId(String.valueOf(receiverId));
+        msg.setPhoto(new InputFile(photos.get(0).getFileId()));
+        msg.setCaption(textToSend);
+
+        try {
+            execute(msg);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendMessageWithPhotoAndInlineKB(Message message, long receiverId, String textToSend,
+            List<List<Pair<String, String>>> buttons) {
+        List<PhotoSize> photos = message.getPhoto();
+        SendPhoto msg = new SendPhoto();
+        msg.setChatId(String.valueOf(receiverId));
+        msg.setPhoto(new InputFile(photos.get(0).getFileId()));
+        msg.setCaption(textToSend);
+        msg.setReplyMarkup(createInlineKeyboard(buttons));
+        try {
+            execute(msg);
+
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
         }
     }
 

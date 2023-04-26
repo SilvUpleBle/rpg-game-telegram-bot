@@ -1,5 +1,8 @@
 package io.project.TestBot.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 
@@ -105,6 +108,19 @@ public class UserSQL implements Comparable<UserSQL> {
         return allActiveTasksId;
     }
 
+    public void deleteTask(Long taskIdLong) {
+        String taskId = String.valueOf(taskIdLong);
+
+        String[] allActiveTasksId = getActiveTasks().split(";");
+        String newTasksId = "";
+        for (String str : allActiveTasksId) {
+            if (!str.equals(taskId)) {
+                newTasksId += str + ";";
+            }
+        }
+        setActiveTasks(newTasksId);
+    }
+
     public void setActiveTasks(String activeTasks) {
         this.activeTasks = activeTasks;
     }
@@ -113,7 +129,7 @@ public class UserSQL implements Comparable<UserSQL> {
         if (this.activeTasks == null) {
             this.activeTasks = activeTasks;
         } else {
-            this.activeTasks += ";%s".formatted(activeTasks);
+            this.activeTasks = this.activeTasks + ";%s".formatted(activeTasks);
         }
     }
 
