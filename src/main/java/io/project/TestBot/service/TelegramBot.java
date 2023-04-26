@@ -417,7 +417,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                         showShop(update.getMessage().getFrom().getId());
                                                     } else {
                                                         if (len >= 4) {
-
                                                             switch (update.getMessage().getText().split(" ")[3]) {
                                                                 case "roll":
                                                                     shopRoll(update.getMessage().getFrom().getId());
@@ -438,7 +437,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                                     }
                                                                     break;
                                                                 case "sell":
-
                                                                     if (len == 4) {
                                                                         showMyItems(
                                                                                 update.getMessage().getFrom().getId());
@@ -482,9 +480,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                         }
                                                     }
                                                     break;
-                                                case "wedding":
-                                                    showUnderConstruct(update.getMessage().getFrom().getId(),
-                                                            new Pair<String, String>("Назад", "/travelTo"));
+                                                case "arena":
+                                                    showArena(user.getUserId());
                                                     break;
                                                 case "library":
                                                     showUnderConstruct(update.getMessage().getFrom().getId(),
@@ -551,9 +548,16 @@ public class TelegramBot extends TelegramLongPollingBot {
                             user_hero.save(hero2);
                             showChangeSkills(update.getMessage().getFrom().getId());
                             break;
-                        case "/createUserBattle", "/createUserBattle@tstbtstst_bot":
+                        case "/sendInviteToArena", "/sendInviteToArena@tstbtstst_bot":
+                            sendInviteToArena(update.getMessage().getFrom().getId(),
+                                    Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/acceptInviteToArena", "/acceptInviteToArena@tstbtstst_bot":
                             createUserBattle(update.getMessage().getFrom().getId(),
                                     Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                            break;
+                        case "/refuseInviteToArena", "/refuseInviteToArena@tstbtstst_bot":
+
                             break;
                         case "/showChangeSkills", "/showChangeSkills@tstbtstst_bot":
                             showChangeSkills(update.getMessage().getFrom().getId());
@@ -826,7 +830,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                                 : item_table.findById(Long.valueOf(hero.getEquipment()[5])).get().toStringWithType());
         sendMessage(userId, textToSend);
         sendMessage(enemyId, textToSend);
-        if (enemy.getCurrentHealth() >= 0) {
+        if (enemy.getCurrentHealth() > 0) {
             user_hero.save(enemy);
             UserState user = user_state.findById(userId).get();
             user.setWaitForRequest(false);
@@ -844,6 +848,8 @@ public class TelegramBot extends TelegramLongPollingBot {
             enemy.setCurrentHealth(enemy.getMaxHealth());
             user_hero.save(hero);
             user_hero.save(enemy);
+            cancel(userId);
+            cancel(enemyId);
         }
     }
 
@@ -933,20 +939,15 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
-        list.get(0).add(new Pair<String, String>(
-                "Таверна" + EmojiParser.parseToUnicode(":beer:"), "/travelTo town bar"));
+        list.get(0).add(new Pair<String, String>("Таверна🍻", "/travelTo town bar"));
         list.get(1).add(
-                new Pair<String, String>("Лавка торговца" + EmojiParser.parseToUnicode(":convenience_store:"),
-                        "/travelTo town shop"));
+                new Pair<String, String>("Лавка торговца🏪", "/travelTo town shop"));
         list.get(2).add(
-                new Pair<String, String>("Библиотека 📚",
+                new Pair<String, String>("Библиотека📚",
                         "/travelTo town shop"));
         list.get(3).add(
-                new Pair<String, String>("Лавка целителя" + EmojiParser.parseToUnicode(":hospital:"),
-                        "/travelTo town hospital"));
-        list.get(4).add(
-                new Pair<String, String>("Бракосочетальная" + EmojiParser.parseToUnicode(":wedding:"),
-                        "/travelTo town wedding"));
+                new Pair<String, String>("Лавка целителя🏥", "/travelTo town hospital"));
+        list.get(4).add(new Pair<String, String>("Арена⚔️", "/travelTo town arena"));
         list.get(5).add(new Pair<String, String>("Назад", "/travelTo"));
         editMenuMessage(userId,
                 "Добро пожаловать! Добро пожаловать в Сити 17.\n Сами вы его выбрали, или его выбрали за вас — это лучший город из оставшихся.\n Я такого высокого мнения о Сити 17, что решил разместить свое правительство здесь, в Цитадели, столь заботливо предоставленной нашими Покровителями.\n Я горжусь тем, что называю Сити 17 своим домом.\n Итак, собираетесь ли вы остаться здесь, или же вас ждут неизвестные дали, добро пожаловать в Сити 17. Здесь безопасно.",
@@ -982,7 +983,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         int k = 0;
         for (int i = 0; i < 7; i++) {// 7 - категорий к продаже
             list.add(new ArrayList<>());
-            for (int j = 0; j < shop.getItemId().length / 7 / 2; j++) {
+            for (int j = 0; j < shop.getItemId().length / 7; j++) {
                 item = item_table.findByItemId(Long.parseLong(shop.getItemId()[k]));
                 k++;
                 list.get(i).add(new Pair<String, String>(
@@ -1032,22 +1033,17 @@ public class TelegramBot extends TelegramLongPollingBot {
             shop_table.delete(delShop);
         }
 
-        Iterable<UserSQL> users = user_table.findAll();
-        List<UserSQL> userList = new ArrayList<>();
         String[] typeList = { "weapon", "head", "chest", "legs", "foots", "talisman", "heal" };
         List<ItemSQL> itemsList = new ArrayList<>();
         Integer rnd;
         String str = "";
-        users.forEach(userList::add);
-        for (int i = 0; i < userList.size(); i++) {
-            ShopSQL shop = new ShopSQL();
-            shop.setShopId(userList.get(i).getUserId());
-            for (String type : typeList) {
-                itemsList = item_table.findByItemType(type);
-                for (int k = 0; k < 2; k++) {
-                    rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
-                    str += itemsList.get(rnd).getItemId() + ";";
-                }
+        ShopSQL shop = new ShopSQL();
+        shop.setShopId(userId);
+        for (String type : typeList) {
+            itemsList = item_table.findByItemType(type);
+            for (int k = 0; k < 2; k++) {
+                rnd = ThreadLocalRandom.current().nextInt(0, itemsList.size());
+                str += itemsList.get(rnd).getItemId() + ";";
             }
             shop.setItemId(str.split(";"));
             shop_table.save(shop);
@@ -1082,25 +1078,34 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void showMyItems(long userId) {
         UserHero hero = user_hero.findByUserId(userId).get();
         List<List<Pair<String, String>>> list = new ArrayList<>();
-        String[] itemsId = hero.getInventory().split(";");
-        // (число + делитель - 1) / делитель
-        // округление в большую сторону
-        int i = 0;
-        for (; i < itemsId.length; i++) {
+        if (hero.getInventory().equals("") || hero.getInventory().equals(null)) {
             list.add(new ArrayList<>());
-            ItemSQL item = item_table.findByItemId(Long.parseLong(itemsId[i]));
-            list.get(i).add(new Pair<String, String>(
-                    item.toStringWithType(),
-                    "/travelTo town shop sell " + itemsId[i]));
+            list.get(0).add(new Pair<String, String>(
+                    "Назад",
+                    "/travelTo town shop"));
+            editMenuMessage(userId,
+                    "У вас нет вещей!",
+                    list);
+
+        } else {
+            String[] itemsId = hero.getInventory().split(";");
+            int i = 0;
+            for (; i < itemsId.length; i++) {
+                list.add(new ArrayList<>());
+                ItemSQL item = item_table.findByItemId(Long.parseLong(itemsId[i]));
+                list.get(i).add(new Pair<String, String>(
+                        item.toStringWithType(),
+                        "/travelTo town shop sell " + itemsId[i]));
+            }
+            i++;
+            list.add(new ArrayList<>());
+            list.get(i - 1).add(new Pair<String, String>(
+                    "Назад",
+                    "/travelTo town shop"));
+            editMenuMessage(userId,
+                    "Ваши товары.\n Какие вы хотите продать?",
+                    list);
         }
-        i++;
-        list.add(new ArrayList<>());
-        list.get(i - 1).add(new Pair<String, String>(
-                "Назад",
-                "/travelTo town shop"));
-        editMenuMessage(userId,
-                "Ваши товары.\n Какие вы хотите продать?",
-                list);
 
     }
 
@@ -1177,6 +1182,46 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         editMenuMessage(userId, textToSend, list);
 
+    }
+
+    private void showArena(Long userId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        Iterable<UserHero> heroes = user_hero.findAll();
+        for (UserHero userHero : heroes) {
+            if (userHero.getUserId() != userId) {
+                list.add(new ArrayList<>());
+                list.get(list.size() - 2)
+                        .add(new Pair<String, String>(
+                                "%s (@%s)".formatted(userHero.getHeroName(),
+                                        user_table.findById(userHero.getUserId()).get().getUserName()),
+                                "/sendInviteToArena " + userHero.getUserId()));
+            }
+        }
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад", "/travelTo town"));
+        editMenuMessage(userId, "Кого вы хотите вызвать на дуэль?", list);
+    }
+
+    private void sendInviteToArena(Long inviterId, Long invitedId) {
+        if (user_state.findById(invitedId).get().getProcess() == null) {
+            showInviteToArena(inviterId, invitedId);
+            editMenuMessage(inviterId, "Приглашение было отправлено!");
+        } else {
+            sendMessage(inviterId, "Игрок в данный момент занят! Выберите кого-нибудь другого!");
+        }
+    }
+
+    private void showInviteToArena(Long inviterId, Long invitedId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        list.get(list.size() - 1).add(new Pair<String, String>("Принять", "/acceptInviteToArena " + inviterId));
+        list.get(list.size() - 1).add(new Pair<String, String>("Отклонить", "/refuseInviteToArena " + inviterId));
+
+        sendMessageWithInlineButtons(invitedId,
+                "<b>%s (@%s)</b> вызывает Вас на поединок!".formatted(user_hero.findById(inviterId).get().getHeroName(),
+                        user_table.findById(inviterId).get().getUserName()),
+                list);
     }
 
     private void showHero(long userId) {
@@ -1617,6 +1662,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 list);
     }
 
+    // TODO можно вернуться и нажать на кнопку снова
     private void acceptInviteToGroup(Long inventedId, Long groupId) {
         if (hero_groups.findById(groupId).isEmpty()) {
             editMessage(inventedId, "Данная группа уже распущена её лидером!");
@@ -1635,7 +1681,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             UserHero hero = user_hero.findById(inventedId).get();
             hero.setIdGroup(groupId);
             user_hero.save(hero);
-            editMessage(inventedId, "Вы прняли приглашение в группу <b>%s</b>!"
+            editMessage(inventedId, "Вы приняли приглашение в группу <b>%s</b>!"
                     .formatted(hero_groups.findById(groupId).get().getGroupName()));
         }
     }
@@ -1688,7 +1734,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         List<List<Pair<String, String>>> list = new ArrayList<>();
 
         List<TaskSQL> taskList = new ArrayList<>();
-        if (!user_table.findById(userId).get().getActiveTasks().equals("")) {
+        if (user_table.findById(userId).get().getActiveTasks() != null
+                || !user_table.findById(userId).get().getActiveTasks().equals("")) {
             String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
             for (int i = 0; i < taskId.length; i++) {
                 TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
