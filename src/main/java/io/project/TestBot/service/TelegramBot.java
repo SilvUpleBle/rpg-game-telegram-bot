@@ -803,22 +803,22 @@ public class TelegramBot extends TelegramLongPollingBot {
             list.get(1).add(new Pair<String, String>("Сдаться", "/giveUp"));
             if (battle.getMessageId() == null) {
                 logToSend = "Противник в ожидании Вашего хода...";
-                battle.setLogId(sendMessage(userId, logToSend).getMessageId());
                 battle.setMessageId(sendMessageWithInlineButtons(userId, textToSend, list).getMessageId());
+                battle.setLogId(sendMessage(userId, logToSend).getMessageId());
             } else {
                 logToSend += battle.getLogMessage() + "\n\nПротивник в ожидании Вашего хода...";
-                editMessage(userId, battle.getLogId(), logToSend);
                 editMessage(userId, battle.getMessageId(), textToSend, list);
+                editMessage(userId, battle.getLogId(), logToSend);
             }
         } else {
             if (battle.getMessageId() == null) {
                 logToSend = "Ожидайте хода противника...";
-                battle.setLogId(sendMessage(userId, logToSend).getMessageId());
                 battle.setMessageId(sendMessage(userId, textToSend).getMessageId());
+                battle.setLogId(sendMessage(userId, logToSend).getMessageId());
             } else {
                 logToSend += battle.getLogMessage() + "\n\nОжидайте хода противника...";
-                editMessage(userId, battle.getLogId(), logToSend);
                 editMessage(userId, battle.getMessageId(), textToSend);
+                editMessage(userId, battle.getLogId(), logToSend);
             }
         }
         battle_table.save(battle);
@@ -1432,7 +1432,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.get(1).add(new Pair<String, String>("Назад", "/hero"));
 
         UserHero hero = user_hero.findById(userId).get();
-        String textToSend = "Профиль героя:\n\nИмя героя: <b>%s</b>\nЗдоровье героя: <b>%s</b>❤️\nУровень героя: <b>%s</b> (%s/%s опыта)\nЗащита: <b>%s</b>\nАтака: <b>%s-%s</b>\nШанс крита: <b>%s%%</b>\nКоличество монет: <b>%d</b>\nКоличество алмазов: <b>%d</b>\nГруппа героя: <b>%s</b>"
+        String textToSend = "Профиль героя:\n\nИмя героя: <b>%s</b>\nЗдоровье героя: <b>%s</b>❤️\nУровень героя: <b>%s</b> (%s/%s опыта)\nЗащита: <b>%s</b>🛡\nАтака: <b>%s-%s</b>🗡\nШанс крита: <b>%s%%</b>🩸\nКоличество монет: <b>%d</b>🟡\nКоличество алмазов: <b>%d</b>💎\nГруппа героя: <b>%s</b>"
                 .formatted(hero.getHeroName(), hero.getHealth(), hero.getLevel(), hero.getExperience(),
                         hero.getExperienceForNewLevel(), hero.getArmor(),
                         hero.getMinAttack(), hero.getMaxAttack(), hero.getCriticalChance(), hero.getMoney(),

@@ -284,9 +284,9 @@ public class UserHero {
         health = (level * 10) + "/" + (level * 10);
         for (int i = 0; i < 4; i++) {
             armor += item_table.findById(Long.valueOf(equipment.split(";")[i])).get().getValue()
-                    * item_table.findById(Long.valueOf(equipment.split(";")[5])).get().getItemLevel();
+                    * item_table.findById(Long.valueOf(equipment.split(";")[i])).get().getItemLevel();
         }
-        criticalChance = item_table.findById(Long.valueOf(equipment.split(";")[4])).get().getItemLevel();
+        criticalChance = item_table.findById(Long.valueOf(equipment.split(";")[4])).get().getValue() / 4;
         if (!equipment.split(";")[5].equals("0")) {
             minAttack = item_table.findById(Long.valueOf(equipment.split(";")[5])).get().getValue();
             maxAttack = minAttack
