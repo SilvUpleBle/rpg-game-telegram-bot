@@ -12,6 +12,8 @@ import io.project.TestBot.model.GroupSQL;
 import io.project.TestBot.model.Hero_groups;
 import io.project.TestBot.model.ItemSQL;
 import io.project.TestBot.model.Item_table;
+import io.project.TestBot.model.PhraseSQL;
+import io.project.TestBot.model.Phrase_table;
 import io.project.TestBot.model.SkillSQL;
 import io.project.TestBot.model.Skill_table;
 import io.project.TestBot.model.ShopSQL;
@@ -80,7 +82,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     private Battle_table battle_table;
     @Autowired
     private Shop_table shop_table;
-
+    @Autowired
+    private Phrase_table phrase_table;
     final BotConfig config;
 
     String[] cats = {
@@ -575,48 +578,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                                     Integer.valueOf(update.getMessage().getText().split(" ")[2]));
                             break;
                         case "/createItems":
-                            List<ItemSQL> list = new ArrayList<>();
-                            // lvl1
-                            list.add(new ItemSQL((long) 0, "ничегошеньки", "all", 0, 0));
-                            list.add(new ItemSQL((long) 1, "яблоко", "heal", 1, 5));
-                            list.add(new ItemSQL((long) 2, "палка-убивалка", "weapon", 1, 5));
-                            list.add(new ItemSQL((long) 3, "клоунский колпак", "head", 1, 1));
-                            list.add(new ItemSQL((long) 4, "алмазный нагрудник", "chest", 1, 2));
-                            list.add(new ItemSQL((long) 5, "штаны из берёзовый коры", "legs", 2, 2));
-                            list.add(new ItemSQL((long) 6, "сапоги-скороходы", "foots", 1, 1));
-                            list.add(new ItemSQL((long) 7, "кольцо всевластия", "talisman", 1, 1));
-                            list.add(new ItemSQL((long) 8, "тетрадь в горошек", "loot", 1, 5));
-                            // lvl 2
-                            list.add(new ItemSQL((long) 9, "атаковальня", "weapon", 2, 8));
-                            list.add(new ItemSQL((long) 10, "ай-кьюдри", "head", 2, 7));
-                            list.add(new ItemSQL((long) 11, "бронежеле", "chest", 2, 6));
-                            list.add(new ItemSQL((long) 12, "балласты", "legs", 2, 10));
-                            list.add(new ItemSQL((long) 13, "олимпийские икры", "foots", 2, 9));
-                            list.add(new ItemSQL((long) 14, "магнитик на доспех", "talisman", 2, 8));
-                            list.add(new ItemSQL((long) 15, "бабушкин пирог", "heal", 2, 9));
-                            list.add(new ItemSQL((long) 16, "кадрило", "loot", 2, 11));
-                            // lvl 3
-                            list.add(new ItemSQL((long) 17, "имба-ланс", "weapon", 3, 17));
-                            list.add(new ItemSQL((long) 18, "моднокль", "head", 3, 10));
-                            list.add(new ItemSQL((long) 19, "ремень безопасности", "chest", 3, 11));
-                            list.add(new ItemSQL((long) 20, "малиновые штаны", "legs", 3, 11));
-                            list.add(new ItemSQL((long) 21, "икронужные мышцы", "foots", 3, 12));
-                            list.add(new ItemSQL((long) 22, "фартбилет", "talisman", 3, 16));
-                            list.add(new ItemSQL((long) 23, "хилюля", "heal", 3, 13));
-                            list.add(new ItemSQL((long) 24, "искра разума", "loot", 3, 14));
-                            // lvl 4
-                            list.add(new ItemSQL((long) 25, "железобатон", "weapon", 4, 15));
-                            list.add(new ItemSQL((long) 26, "оптоволоконный парик", "head", 4, 16));
-                            list.add(new ItemSQL((long) 27, "драпательное пальто", "chest", 4, 18));
-                            list.add(new ItemSQL((long) 28, "лосины ассасина", "legs", 4, 17));
-                            list.add(new ItemSQL((long) 29, "до-колен-вал", "foots", 4, 17));
-                            list.add(new ItemSQL((long) 30, "ожирелье", "talisman", 4, 22));
-                            list.add(new ItemSQL((long) 31, "иконка со свечкой", "heal", 4, 5));
-                            list.add(new ItemSQL((long) 32, "окаменевший пельмень", "loot", 4, 20));
 
-                            // imba
-                            list.add(new ItemSQL((long) 27, "Доспех Императора Человечества", "chest", 26, 150));
-                            createItems(list);
+                            createItems();
+                            break;
+                        case "/createPhrases":
+
+                            createPhrases();
                             break;
 
                         default:
@@ -964,6 +931,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void showTown(long userId) {
+        if (phrase_table.count() == 0) {
+            createPhrases();
+        }
+        List<PhraseSQL> phrases = phrase_table.findByType("town");
+        Integer rnd = ThreadLocalRandom.current().nextInt(0, phrases.size());
         List<List<Pair<String, String>>> list = new ArrayList<>();
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
@@ -978,7 +950,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         "/travelTo town shop"));
         list.get(2).add(
                 new Pair<String, String>("Библиотека 📚",
-                        "/travelTo town shop"));
+                        "/travelTo town library"));
         list.get(3).add(
                 new Pair<String, String>("Лавка целителя" + EmojiParser.parseToUnicode(":hospital:"),
                         "/travelTo town hospital"));
@@ -987,12 +959,18 @@ public class TelegramBot extends TelegramLongPollingBot {
                         "/travelTo town wedding"));
         list.get(5).add(new Pair<String, String>("Назад", "/travelTo"));
         editMenuMessage(userId,
-                "Добро пожаловать! Добро пожаловать в Сити 17.\n Сами вы его выбрали, или его выбрали за вас — это лучший город из оставшихся.\n Я такого высокого мнения о Сити 17, что решил разместить свое правительство здесь, в Цитадели, столь заботливо предоставленной нашими Покровителями.\n Я горжусь тем, что называю Сити 17 своим домом.\n Итак, собираетесь ли вы остаться здесь, или же вас ждут неизвестные дали, добро пожаловать в Сити 17. Здесь безопасно.",
+                phrases.get(rnd).getText() + "\n\nВ городе можно зайти в интересующее вас место",
                 list);
     }
 
     private void showShop(long userId) {
+        if (phrase_table.count() == 0) {
+            createPhrases();
+        }
+        List<PhraseSQL> phrases = phrase_table.findByType("shop");
+        Integer rnd = ThreadLocalRandom.current().nextInt(0, phrases.size());
         List<List<Pair<String, String>>> list = new ArrayList<>();
+
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
         list.add(new ArrayList<>());
@@ -1004,8 +982,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         list.get(2).add(new Pair<String, String>(
                 "Продать свои вещи 💰", "/travelTo town shop sell"));
         list.get(3).add(new Pair<String, String>("Назад", "/travelTo town"));
+
         editMenuMessage(userId,
-                "Лавка торговца, тут можно купить новые и продать старые вещи!",
+                phrases.get(rnd).getText() + "\n\nЛавка торговца, тут можно купить новые и продать старые вещи!",
                 list);
     }
 
@@ -1020,7 +999,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         int k = 0;
         for (int i = 0; i < 7; i++) {// 7 - категорий к продаже
             list.add(new ArrayList<>());
-            for (int j = 0; j < shop.getItemId().length / 7 / 2; j++) {
+            for (int j = 0; j < shop.getItemId().length / 7; j++) {
                 item = item_table.findByItemId(Long.parseLong(shop.getItemId()[k]));
                 k++;
                 list.get(i).add(new Pair<String, String>(
@@ -1038,6 +1017,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void buyProduct(long userId, String itemIdStr) {
+        if (phrase_table.count() == 0) {
+            createPhrases();
+        }
+        List<PhraseSQL> phrases = phrase_table.findByType("shop_after_buying");
+        Integer rnd = ThreadLocalRandom.current().nextInt(0, phrases.size());
 
         long itemId = Long.parseLong(itemIdStr);
         UserHero hero = user_hero.findByUserId(userId).get();
@@ -1052,7 +1036,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             list.add(new ArrayList<>());
             list.get(0).add(new Pair<String, String>("Назад", "/travelTo town shop show"));
             editMenuMessage(userId,
-                    "Поздравляем, вы приобрели: " + item.toStringWithType() + " за "
+                    phrases.get(rnd).getText() + "\n\nПоздравляем, вы приобрели: " + item.toStringWithType() + " за "
                             + price + " злотых",
                     list);
         } else {
@@ -1168,6 +1152,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void showHospital(long userId) {
+        if (phrase_table.count() == 0) {
+            createPhrases();
+        }
+        List<PhraseSQL> phrases = phrase_table.findByType("healer");
+        Integer rnd = ThreadLocalRandom.current().nextInt(0, phrases.size());
         UserHero hero = user_hero.findByUserId(userId).get();
         List<List<Pair<String, String>>> list = new ArrayList<>();
         list.add(new ArrayList<>());
@@ -1186,9 +1175,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                 "/travelTo town hospital 4"));
         list.get(2).add(new Pair<String, String>("Назад", "/travelTo town"));
         editMenuMessage(userId,
-                "Лавка целителя\n Можете выбрать способ лечения, который вам по карману\n Ваше здоровье: "
-                        + hero.getCurrentHealth() + "/" + hero.getMaxHealth() + "\n Кошелек: " + hero.getMoney()
-                        + " злотых",
+                phrases.get(rnd).getText()
+                        + "\n\nЛавка целителя\n Можете выбрать способ лечения, который вам по карману\n Ваше здоровье: "
+                        + hero.getCurrentHealth() + "/" + hero.getMaxHealth() + "❤️" + "\n Кошелек: " + hero.getMoney()
+                        + " злотых💰",
                 list);
     }
 
@@ -2004,10 +1994,130 @@ public class TelegramBot extends TelegramLongPollingBot {
         showUserInfo(chatId, userId);
     }
 
-    private void createItems(List<ItemSQL> list) {
+    private void createItems() {
+        List<ItemSQL> list = new ArrayList<>();
+        // lvl1
+        list.add(new ItemSQL((long) 0, "ничегошеньки", "all", 0, 0));
+        list.add(new ItemSQL((long) 1, "яблоко", "heal", 1, 5));
+        list.add(new ItemSQL((long) 2, "палка-убивалка", "weapon", 1, 5));
+        list.add(new ItemSQL((long) 3, "клоунский колпак", "head", 1, 1));
+        list.add(new ItemSQL((long) 4, "алмазный нагрудник", "chest", 1, 2));
+        list.add(new ItemSQL((long) 5, "штаны из берёзовый коры", "legs", 1, 2));
+        list.add(new ItemSQL((long) 6, "сапоги-скороходы", "foots", 1, 1));
+        list.add(new ItemSQL((long) 7, "кольцо всевластия", "talisman", 1, 1));
+        list.add(new ItemSQL((long) 8, "тетрадь в горошек", "loot", 1, 5));
+        // lvl 2
+        list.add(new ItemSQL((long) 9, "атаковальня", "weapon", 2, 8));
+        list.add(new ItemSQL((long) 10, "ай-кьюдри", "head", 2, 7));
+        list.add(new ItemSQL((long) 11, "бронежеле", "chest", 2, 6));
+        list.add(new ItemSQL((long) 12, "балласты", "legs", 2, 10));
+        list.add(new ItemSQL((long) 13, "олимпийские икры", "foots", 2, 9));
+        list.add(new ItemSQL((long) 14, "магнитик на доспех", "talisman", 2, 8));
+        list.add(new ItemSQL((long) 15, "бабушкин пирог", "heal", 2, 9));
+        list.add(new ItemSQL((long) 16, "кадрило", "loot", 2, 11));
+        // lvl 3
+        list.add(new ItemSQL((long) 17, "имба-ланс", "weapon", 3, 17));
+        list.add(new ItemSQL((long) 18, "моднокль", "head", 3, 10));
+        list.add(new ItemSQL((long) 19, "ремень безопасности", "chest", 3, 11));
+        list.add(new ItemSQL((long) 20, "малиновые штаны", "legs", 3, 11));
+        list.add(new ItemSQL((long) 21, "икронужные мышцы", "foots", 3, 12));
+        list.add(new ItemSQL((long) 22, "фартбилет", "talisman", 3, 16));
+        list.add(new ItemSQL((long) 23, "хилюля", "heal", 3, 13));
+        list.add(new ItemSQL((long) 24, "искра разума", "loot", 3, 14));
+        // lvl 4
+        list.add(new ItemSQL((long) 25, "железобатон", "weapon", 4, 15));
+        list.add(new ItemSQL((long) 26, "оптоволоконный парик", "head", 4, 16));
+        list.add(new ItemSQL((long) 27, "драпательное пальто", "chest", 4, 18));
+        list.add(new ItemSQL((long) 28, "лосины ассасина", "legs", 4, 17));
+        list.add(new ItemSQL((long) 29, "до-колен-вал", "foots", 4, 17));
+        list.add(new ItemSQL((long) 30, "ожирелье", "talisman", 4, 22));
+        list.add(new ItemSQL((long) 31, "иконка со свечкой", "heal", 4, 5));
+        list.add(new ItemSQL((long) 32, "окаменевший пельмень", "loot", 4, 20));
+
+        // imba
+        list.add(new ItemSQL((long) 27, "Доспех Императора Человечества", "chest", 26, 150));
         for (ItemSQL item : list) {
             item_table.save(item);
         }
+    }
+
+    private void createPhrases() {
+        List<PhraseSQL> list = new ArrayList<>();
+        // shop on enter
+        int i = 0;
+        list.add(new PhraseSQL((long) i,
+                "Заходя в магазин вы видите надпись:\n В машазин срочно требуются покупатели\n (пол и возраст значения не имеют!)",
+                "shop"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "Заходя в магазин вы видите надпись:\n У нас опять завелась крыса, бестолочь в человеческом обличие.\n Ловим дружно, мнем шкурку!",
+                "shop"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "Заходя в магазин вас встречает старичок-торговец со словами\n Ну наконец-то мой ЛУЧШИЙ покупатель!",
+                "shop"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "У входа в магазин, вы видите разборку, видимо семейной пары, вы решаете быстрее забежать внутрь, пока вам не досталось",
+                "shop"));
+        i++;
+        // shop after buying
+        list.add(new PhraseSQL((long) i,
+                "Старичок-торговец, хитро улыбаясь говорит - поздравляю с покупкой столь дивной вещицы😈",
+                "shop_after_buying"));
+        i++;
+        list.add(new PhraseSQL((long) i, "Вот это я понимаю, ВЕЩЬ!!!", "shop_after_buying"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "В лавку забежал 'странный человек', прокричав \n- ЭТО МОЁЁЁ \n он попытался отобрать вашу покупку, но потерпев неудачу сбежал!",
+                "shop_after_buying"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "Увидев вашу покупку другой покупатель с напыщенным видом прокомментировал \n - А вот это я брать бы не стал🤭",
+                "shop_after_buying"));
+        i++;
+        // town
+        list.add(new PhraseSQL((long) i,
+                "Эх, старый добрый город, кто бы ты ни был, куда бы ни шёл, кто-нибудь в этом городе хочет убить тебя.",
+                "town"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "Добро пожаловать! Добро пожаловать в Сити 17.\n Сами вы его выбрали, или его выбрали за вас — это лучший город из оставшихся.\n Я такого высокого мнения о Сити 17, что решил разместить свое правительство здесь, в Цитадели, столь заботливо предоставленной нашими Покровителями.\n Я горжусь тем, что называю Сити 17 своим домом.\n Итак, собираетесь ли вы остаться здесь, или же вас ждут неизвестные дали, добро пожаловать в Сити 17. Здесь безопасно.",
+                "town"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "К вам подошел 'странный человек'\n Я не тебе не доверяю.\n Затем он убегает\n Про себя вы думаете - И что это было?",
+                "town"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "Зайдя в город вы увидели надпись\n Жить у нас интересно, но нервно.\n Поэтому мы веселые, но злые",
+                "town"));
+        i++;
+        // library
+
+        // healer
+        list.add(new PhraseSQL((long) i,
+                "Как только вы зашли к целителю он улыбнувшись подозвал вас к себе и спросил\n - Что привело вас ко мне, дорогой друг?",
+                "healer"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "У целителя сегодня уйма народу, постояв пол часа, вы наконец зашли",
+                "healer"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "Заходя к целителю вы спросили \n - Доктор, сколько стоит вырвать зуб? \n - 20 долларов. \n- 20 долларов за три минуты?\n- Ну, хорошо, я буду тянуть дольше! \n - Нет, пожалуй не сегодня.",
+                "healer"));
+        i++;
+        list.add(new PhraseSQL((long) i,
+                "- Доктор, я работаю как лошадь, ем как свинья, устаю как собака - что мне делать? \n- Э, батенька, да вам к ветеринару...",
+                "healer"));
+        i++;
+        // healer_if_full_hp
+        // healer_if_heal
+        for (PhraseSQL phrase : list) {
+            phrase_table.save(phrase);
+        }
+
     }
 
     private void giveItem(Long userId, Long itemId) {
