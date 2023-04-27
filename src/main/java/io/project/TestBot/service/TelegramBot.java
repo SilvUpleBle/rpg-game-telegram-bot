@@ -235,6 +235,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 if (messageText.equals("/cancel") || user.getProcess() == null
                         || messageText.equals("/cancel@tstbtstst_bot")) {
                     switch (messageText) {
+                        case "/start":
+                            sendMessage(chatId, messageText)
+                            break;
+                        case "/start@tstbtstst_bot":
+                            break;
                         case "/create_user", "/create_user@tstbtstst_bot":
                             createUser(update.getMessage());
                             break;
@@ -439,11 +444,21 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                                         showProduct(
                                                                                 update.getMessage().getFrom().getId());
                                                                     } else {
-                                                                        buyProduct(
-                                                                                update.getMessage().getFrom()
-                                                                                        .getId(),
-                                                                                update.getMessage().getText()
-                                                                                        .split(" ")[4]);
+                                                                        if (len == 5) {
+                                                                            showItem(
+                                                                                    update.getMessage().getFrom()
+                                                                                            .getId(),
+                                                                                    update.getMessage().getText()
+                                                                                            .split(" ")[4],
+                                                                                    "buy");
+                                                                        } else {
+                                                                            buyProduct(
+                                                                                    update.getMessage().getFrom()
+                                                                                            .getId(),
+                                                                                    update.getMessage().getText()
+                                                                                            .split(" ")[5]);
+                                                                        }
+
                                                                     }
                                                                     break;
                                                                 case "sell":
@@ -451,11 +466,22 @@ public class TelegramBot extends TelegramLongPollingBot {
                                                                         showMyItems(
                                                                                 update.getMessage().getFrom().getId());
                                                                     } else {
-                                                                        sellMyItems(
-                                                                                update.getMessage().getFrom()
-                                                                                        .getId(),
-                                                                                update.getMessage().getText()
-                                                                                        .split(" ")[4]);
+                                                                        if (len == 5) {
+                                                                            showItem(
+                                                                                    update.getMessage().getFrom()
+                                                                                            .getId(),
+                                                                                    update.getMessage().getText()
+                                                                                            .split(" ")[4],
+                                                                                    "sell");
+
+                                                                        } else {
+                                                                            sellMyItems(
+                                                                                    update.getMessage().getFrom()
+                                                                                            .getId(),
+                                                                                    update.getMessage().getText()
+                                                                                            .split(" ")[5]);
+                                                                        }
+
                                                                     }
                                                                     break;
                                                             }
@@ -601,6 +627,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             "Выполнение предыдущей функции ещё не завершено!\nЕсли возникла ошибка, используйте /cancel!");
                 }
             }
+
         }
     }
 
@@ -1031,7 +1058,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 item = item_table.findByItemId(Long.parseLong(shop.getItemId()[k]));
                 k++;
                 list.get(i).add(new Pair<String, String>(
-                        item.toStringWithType() + " " + String.valueOf((5 + item.getItemLevel() * 10)) + " злотых",
+                        item.toStringWithType(),
                         "/travelTo town shop show " + item.getItemId()));
             }
         }
@@ -1042,6 +1069,32 @@ public class TelegramBot extends TelegramLongPollingBot {
                 "Тут можно купить, все нужное для выживания \n Кошелек: " + hero.getMoney()
                         + " злотых",
                 list);
+    }
+
+    private void showItem(long userId, String itemId, String type) {// type is for bying or sell
+        UserHero hero = user_hero.findByUserId(userId).get();
+        ItemSQL item = item_table.findByItemId(Long.parseLong(itemId));
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+        list.add(new ArrayList<>());
+        if (type.equals("buy")) {
+            list.get(0).add(new Pair<String, String>("Купить", "/travelTo town shop show buy " + itemId));
+            list.get(1).add(new Pair<String, String>("Назад", "/travelTo town shop show"));
+            editMenuMessage(userId,
+                    "У вас " + hero.getMoney() + "🟡\nВы хотите купить " + item.toStringWithType() + " за "
+                            + (5 + item.getItemLevel() * 10) + "🟡",
+                    list);
+        } else {
+            if (type.equals("sell")) {
+                list.get(0).add(new Pair<String, String>("Продать", "/travelTo town shop sell sell " + itemId));
+                list.get(1).add(new Pair<String, String>("Назад", "/travelTo town shop sell"));
+                editMenuMessage(userId,
+                        "У вас " + hero.getMoney() + "🟡\nВы хотите купить " + item.toStringWithType() + " за "
+                                + (5 + item.getItemLevel() * 10) + "🟡",
+                        list);
+            }
+        }
+
     }
 
     private void buyProduct(long userId, String itemIdStr) {
@@ -1144,7 +1197,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 list.add(new ArrayList<>());
                 ItemSQL item = item_table.findByItemId(Long.parseLong(itemsId[i]));
                 list.get(i).add(new Pair<String, String>(
-                        item.toStringWithType() + " " + String.valueOf((5 + item.getItemLevel() * 8)) + " злотых",
+                        item.toStringWithType(),
                         "/travelTo town shop sell " + itemsId[i]));
             }
             i++;
@@ -2747,6 +2800,29 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Error occurred: " + e.getMessage());
         }
         return msg;
+    }
+
+    private void sendMenuMessageWithPic(long chatId, String textToSend, List<List<Pair<String, String>>> buttons,
+            String imageUrlToSend) {
+
+        SendPhoto photo = new SendPhoto();
+        photo.setChatId(String.valueOf(chatId));
+        photo.setCaption(textToSend);
+        photo.setPhoto(new InputFile(imageUrlToSend));
+        photo.setReplyMarkup(createInlineKeyboard(buttons));
+
+        try {
+            Message msg = execute(photo);
+
+            if (!user_state.findById(chatId).isEmpty()) {
+                UserState user = user_state.findById(chatId).get();
+                user.setIdLastBotMessage(msg.getMessageId());
+                user.setIdMenuMessage(msg.getMessageId());
+                user_state.save(user);
+            }
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
     }
 
     private void editMenuMessage(long chatId, String newMessage) {
