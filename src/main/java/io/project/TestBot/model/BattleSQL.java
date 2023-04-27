@@ -30,13 +30,17 @@ public class BattleSQL {
 
     private String logMessage;
 
+    private boolean isEnd;
+
     public BattleSQL() {
+        isEnd = false;
     }
 
     public BattleSQL(String secondSide, Long[] firstSideIds, Long[] secondSideIds) {
         this.secondSide = secondSide;
         this.firstSideIds = firstSideIds;
         this.secondSideIds = secondSideIds;
+        isEnd = false;
     }
 
     public Long getBattleId() {
@@ -101,6 +105,14 @@ public class BattleSQL {
 
     public void setLogMessage(String logMessage) {
         this.logMessage = logMessage;
+    }
+
+    public boolean isEnd() {
+        return isEnd;
+    }
+
+    public void setIsEnd(boolean isEnd) {
+        this.isEnd = isEnd;
     }
 
 }

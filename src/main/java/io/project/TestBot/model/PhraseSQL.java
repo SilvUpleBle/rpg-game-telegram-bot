@@ -1,15 +1,12 @@
 package io.project.TestBot.model;
 
-import jakarta.annotation.Generated;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 
 @Entity(name = "phrase_table")
 public class PhraseSQL {
 
     @Id
-    @GeneratedValue
     private Long phraseId;
 
     private String text;
@@ -20,7 +17,8 @@ public class PhraseSQL {
 
     }
 
-    public PhraseSQL(String text, String type) {
+    public PhraseSQL(Long phraseId, String text, String type) {
+        this.phraseId = phraseId;
         this.text = text;
         this.type = type;
     }

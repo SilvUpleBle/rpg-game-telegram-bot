@@ -211,14 +211,20 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/battle":
                         BattleSQL battle = battle_table.findById(user.getBattleId()).get();
                         switch (messageText) {
-                            case "/showFirstBattleMessage":
+                            case "/showBattleMessage":
                                 showFirstBattleMessage(user.getUserId());
                                 break;
                             case "/showHeroSkillsInBattle":
                                 showHeroSkillsInBattle(user.getUserId());
                                 break;
+                            case "/showSkillInfo":
+                                showSkillInfoInBattle(user.getUserId(),
+                                        Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                                break;
                             case "/useSkill":
-
+                                useSkill(user.getUserId(),
+                                        Long.valueOf(update.getMessage().getText().split(" ")[1]),
+                                        Long.valueOf(update.getMessage().getText().split(" ")[2]));
                                 break;
                             case "/useAttack":
                                 useAttack(user.getUserId(), Long.valueOf(update.getMessage().getText().split(" ")[1]));
@@ -236,7 +242,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         || messageText.equals("/cancel@tstbtstst_bot")) {
                     switch (messageText) {
                         case "/start":
-                            sendMessage(chatId, messageText)
+                            sendMessage(chatId, messageText);
                             break;
                         case "/start@tstbtstst_bot":
                             break;
@@ -821,19 +827,34 @@ public class TelegramBot extends TelegramLongPollingBot {
                     hero.getHealth());
         }
 
+        hero = user_hero.findById(userId).get();
         if (userState.getWaitForRequest()) {
             List<List<Pair<String, String>>> list = new ArrayList<>();
             list.add(new ArrayList<>());
             list.add(new ArrayList<>());
             list.get(0).add(new Pair<String, String>("Атаковать", "/useAttack " + battle.getSecondSideIds()[0]));
-            list.get(0).add(new Pair<String, String>("Способность", "/showHeroSkillsInBattle"));
+            list.get(0).add(
+                    new Pair<String, String>("Способность", "/showHeroSkillsInBattle"));
             list.get(1).add(new Pair<String, String>("Сдаться", "/giveUp"));
             if (battle.getMessageId() == null) {
                 logToSend = "Противник в ожидании Вашего хода...";
                 battle.setMessageId(sendMessageWithInlineButtons(userId, textToSend, list).getMessageId());
                 battle.setLogId(sendMessage(userId, logToSend).getMessageId());
             } else {
-                logToSend += battle.getLogMessage() + "\n\nПротивник в ожидании Вашего хода...";
+                if (battle.isEnd()) {
+                    logToSend += battle.getLogMessage();
+                    if (hero.getCurrentHealth() == 0) {
+                        logToSend += "\n\nВы проиграли!\nЗдоровье участников восстановлено.";
+                    } else {
+                        logToSend += "\n\nВы победили!\nЗдоровье участников восстановлено.";
+                    }
+                } else {
+                    if (battle.getLogMessage() != null) {
+                        logToSend += battle.getLogMessage() + "\n\nПротивник в ожидании Вашего хода...";
+                    } else {
+                        logToSend += "\n\nПротивник в ожидании Вашего хода...";
+                    }
+                }
                 editMessage(userId, battle.getMessageId(), textToSend, list);
                 editMessage(userId, battle.getLogId(), logToSend);
             }
@@ -843,7 +864,20 @@ public class TelegramBot extends TelegramLongPollingBot {
                 battle.setMessageId(sendMessage(userId, textToSend).getMessageId());
                 battle.setLogId(sendMessage(userId, logToSend).getMessageId());
             } else {
-                logToSend += battle.getLogMessage() + "\n\nОжидайте хода противника...";
+                if (battle.isEnd()) {
+                    logToSend += battle.getLogMessage();
+                    if (hero.getCurrentHealth() == 0) {
+                        logToSend += "\n\nВы проиграли!\nЗдоровье участников восстановлено.";
+                    } else {
+                        logToSend += "\n\nВы победили!\nЗдоровье участников восстановлено.";
+                    }
+                } else {
+                    if (battle.getLogMessage() != null) {
+                        logToSend += battle.getLogMessage() + "\n\nОжидайте хода противника...";
+                    } else {
+                        logToSend += "\n\nОжидайте хода противника...";
+                    }
+                }
                 editMessage(userId, battle.getMessageId(), textToSend);
                 editMessage(userId, battle.getLogId(), logToSend);
             }
@@ -851,22 +885,22 @@ public class TelegramBot extends TelegramLongPollingBot {
         battle_table.save(battle);
     }
 
-    private void showBattleMessage(Long userId) {
-
-    }
-
     private void showHeroSkillsInBattle(Long userId) {
         List<List<Pair<String, String>>> list = new ArrayList<>();
         list.add(new ArrayList<>());
+        BattleSQL battle = battle_table.findById(user_state.findById(userId).get().getBattleId()).get();
         UserHero hero = user_hero.findById(userId).get();
         for (Long skillId : hero.getEquipedSkills()) {
-            list.add(new ArrayList<>());
-            list.get(list.size() - 2).add(new Pair<String, String>(skill_table.findById(skillId).get().getSkillName(),
-                    "/useSkill " + skillId));
+            if (skillId != null) {
+                list.add(new ArrayList<>());
+                list.get(list.size() - 2)
+                        .add(new Pair<String, String>(skill_table.findById(skillId).get().getSkillName(),
+                                "/showSkillInfo " + skillId));
+            }
         }
         list.get(list.size() - 1).add(new Pair<String, String>("Назад",
                 "/showBattleMessage"));
-        editMenuMessage(userId, "Способности героя:", list);
+        editMessage(userId, battle.getMessageId(), "Доступные способности:", list);
     }
 
     private void useAttack(Long userId, Long enemyId) {
@@ -895,12 +929,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             battle_table.save(heroBattle);
             battle_table.save(enemyBattle);
         } else {
+            heroBattle.setIsEnd(true);
+            enemyBattle.setIsEnd(true);
+            battle_table.save(heroBattle);
+            battle_table.save(enemyBattle);
             enemy.setCurrentHealth(0);
             user_hero.save(enemy);
-            textToSend = "Поединок окончен! Победил <b>%s</b>!\nЗдоровье участников восстановлено."
-                    .formatted(hero.getHeroName());
-            sendMessage(userId, textToSend);
-            sendMessage(enemyId, textToSend);
             hero.setCurrentHealth(hero.getMaxHealth());
             enemy.setCurrentHealth(enemy.getMaxHealth());
             cancel(userId);
@@ -912,12 +946,147 @@ public class TelegramBot extends TelegramLongPollingBot {
         user_hero.save(enemy);
     }
 
+    private void showSkillInfoInBattle(Long userId, Long skillId) {
+        List<List<Pair<String, String>>> list = new ArrayList<>();
+        list.add(new ArrayList<>());
+
+        SkillSQL skill = skill_table.findById(skillId).get();
+        BattleSQL battle = battle_table.findById(user_state.findById(userId).get().getBattleId()).get();
+        String textToSend = "Информация о способности:\n\nНазвание: <b>%s</b>\nТип: <b>%s</b>\nЦель: <b>%s</b>"
+                .formatted(skill.getSkillName(), skill.getSkillEffect(), skill.getSkillTarget());
+        textToSend += skill.getSkillEffect().equals("damage")
+                ? "\nУрон: <b>%s-%s</b>🗡".formatted(skill.getMinValue(), skill.getMaxValue())
+                : "\nЛечение: <b>%s-%s</b>💊".formatted(skill.getMinValue(), skill.getMaxValue());
+        if (skill.getSkillTarget().equals("enemy")) {
+            for (Long enemyId : battle.getSecondSideIds()) {
+                list.add(new ArrayList<>());
+                list.get(list.size() - 1)
+                        .add(new Pair<String, String>("🔴" + user_hero.findById(enemyId).get().getHeroName(),
+                                "/useSkill " + skillId + " " + enemyId));
+            }
+        }
+        if (skill.getSkillTarget().equals("enemy")) {
+            for (Long teammateId : battle.getFirstSideIds()) {
+                list.add(new ArrayList<>());
+                list.get(list.size() - 1)
+                        .add(new Pair<String, String>("🟢" + user_hero.findById(teammateId).get().getHeroName(),
+                                "/useSkill " + skillId + " " + teammateId));
+            }
+        } else {
+            list.add(new ArrayList<>());
+            list.get(list.size() - 1)
+                    .add(new Pair<String, String>("Использовать", "/useSkill " + skillId + " " + userId));
+        }
+
+        list.get(list.size() - 1).add(new Pair<String, String>("Назад",
+                "/showHeroSkillsInBattle"));
+
+        if (battle.getMessageId() == null) {
+            battle.setMessageId(sendMessageWithInlineButtons(userId, textToSend, list).getMessageId());
+        } else {
+            editMessage(userId, battle.getMessageId(), textToSend, list);
+        }
+    }
+
     private void useSkill(Long userId, Long skillId, Long enemyId) {
         SkillSQL skill = skill_table.findById(skillId).get();
         UserHero hero = user_hero.findById(userId).get();
         UserHero enemy = user_hero.findById(enemyId).get();
         BattleSQL battle = battle_table.findById(user_state.findById(userId).get().getBattleId()).get();
+        BattleSQL enemyBattle = battle_table
+                .findById(user_state.findById(battle.getSecondSideIds()[0]).get().getBattleId()).get();
+        int attack;
+        int impact;
+        String textToSend = "";
 
+        switch (skill.getSkillTarget()) {
+            case "self":
+                attack = ThreadLocalRandom.current().nextInt(skill.getMinValue(), skill.getMaxValue() + 1);
+                hero.setCurrentHealth(hero.getCurrentHealth() + attack);
+                user_hero.save(hero);
+                textToSend = "<b>%s</b> восстановил себе <b>%s</b>💊 здоровья, используя <b>%s</b>!"
+                        .formatted(hero.getHeroName(), attack, skill.getSkillName());
+                break;
+            case "teammate":
+                attack = ThreadLocalRandom.current().nextInt(skill.getMinValue(), skill.getMaxValue() + 1);
+                enemy.setCurrentHealth(enemy.getCurrentHealth() + attack);
+                user_hero.save(enemy);
+                textToSend = "<b>%s</b> восстановил <b>%s</b> <b>%s</b>💊 здоровья, используя <b>%s</b>!"
+                        .formatted(hero.getHeroName(), enemy.getHeroName(), attack, skill.getSkillName());
+                break;
+            case "teammates":
+                for (Long id : battle.getFirstSideIds()) {
+                    enemy = user_hero.findById(id).get();
+                    attack = ThreadLocalRandom.current().nextInt(skill.getMinValue(), skill.getMaxValue() + 1);
+                    enemy.setCurrentHealth(enemy.getCurrentHealth() + attack);
+                    user_hero.save(enemy);
+                    textToSend += "<b>%s</b> восстановил <b>%s</b> <b>%s</b>💊 здоровья, используя <b>%s</b>!"
+                            .formatted(hero.getHeroName(), enemy.getHeroName(), attack, skill.getSkillName());
+                }
+                break;
+            case "enemy":
+                attack = ThreadLocalRandom.current().nextInt(skill.getMinValue(), skill.getMaxValue() + 1);
+                impact = attack - enemy.getArmor() < 0 ? 0 : attack - enemy.getArmor();
+                enemy.setCurrentHealth(enemy.getCurrentHealth() - impact);
+                user_hero.save(enemy);
+                textToSend += "<b>%s</b> нанёс <b>%d</b> урона <b>%s</b>, используя <b>%s</b>!\n(%d🗡 - %d🛡)"
+                        .formatted(hero.getHeroName(), impact, enemy.getHeroName(),
+                                skill.getSkillName(), attack, enemy.getArmor());
+                break;
+            case "enemys":
+                for (Long id : battle.getFirstSideIds()) {
+                    enemy = user_hero.findById(id).get();
+                    attack = ThreadLocalRandom.current().nextInt(skill.getMinValue(), skill.getMaxValue() + 1);
+                    impact = attack - enemy.getArmor() < 0 ? 0 : attack - enemy.getArmor();
+                    enemy.setCurrentHealth(enemy.getCurrentHealth() - impact);
+                    user_hero.save(enemy);
+                    textToSend += "<b>%s</b> нанёс <b>%d</b> урона <b>%s</b>, используя <b>%s</b>!\n(%d🗡 - %d🛡)"
+                            .formatted(hero.getHeroName(), impact, enemy.getHeroName(),
+                                    skill.getSkillName(), attack, enemy.getArmor());
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        battle.setLogMessage(textToSend);
+        enemyBattle.setLogMessage(textToSend);
+        battle_table.save(battle);
+        battle_table.save(enemyBattle);
+        checkBattleToEnd(battle);
+
+        showFirstBattleMessage(userId);
+        showFirstBattleMessage(enemyId);
+    }
+
+    private void checkBattleToEnd(BattleSQL battle) {
+        BattleSQL enemyBattle = battle_table
+                .findById(user_state.findById(battle.getSecondSideIds()[0]).get().getBattleId()).get();
+        boolean isEnd = true;
+        UserState hero;
+
+        for (Long id : enemyBattle.getSecondSideIds()) {
+            hero = user_state.findById(id).get();
+            hero.setWaitForRequest(true);
+            user_state.save(hero);
+            if (user_hero.findById(id).get().getCurrentHealth() > 0) {
+                isEnd = false;
+            }
+        }
+        for (Long id : enemyBattle.getFirstSideIds()) {
+            hero = user_state.findById(id).get();
+            hero.setWaitForRequest(false);
+            user_state.save(hero);
+            if (user_hero.findById(id).get().getCurrentHealth() > 0) {
+                isEnd = false;
+            }
+        }
+
+        battle.setIsEnd(isEnd);
+        enemyBattle.setIsEnd(isEnd);
+        battle_table.save(battle);
+        battle_table.save(enemyBattle);
     }
 
     // TODO сделать универсальную проверку
@@ -1844,7 +2013,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         List<TaskSQL> taskList = new ArrayList<>();
         if (user_table.findById(userId).get().getActiveTasks() != null
-                || !user_table.findById(userId).get().getActiveTasks().equals("")) {
+                && !user_table.findById(userId).get().getActiveTasks().equals("")) {
             String[] taskId = user_table.findById(userId).get().getAllActiveTasksId();
             for (int i = 0; i < taskId.length; i++) {
                 TaskSQL task = task_table.findByTaskId(Long.parseLong(taskId[i]));
@@ -2165,57 +2334,58 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void createPhrases() {
+        Long i = (long) 0;
         List<PhraseSQL> list = new ArrayList<>();
         // shop on enter
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Заходя в магазин вы видите надпись:\n В машазин срочно требуются покупатели\n (пол и возраст значения не имеют!)",
                 "shop"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Заходя в магазин вы видите надпись:\n У нас опять завелась крыса, бестолочь в человеческом обличие.\n Ловим дружно, мнем шкурку!",
                 "shop"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Заходя в магазин вас встречает старичок-торговец со словами\n Ну наконец-то мой ЛУЧШИЙ покупатель!",
                 "shop"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "У входа в магазин, вы видите разборку, видимо семейной пары, вы решаете быстрее забежать внутрь, пока вам не досталось",
                 "shop"));
         // shop after buying
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Старичок-торговец, хитро улыбаясь говорит - поздравляю с покупкой столь дивной вещицы😈",
                 "shop_after_buying"));
-        list.add(new PhraseSQL("Вот это я понимаю, ВЕЩЬ!!!", "shop_after_buying"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++, "Вот это я понимаю, ВЕЩЬ!!!", "shop_after_buying"));
+        list.add(new PhraseSQL(i++,
                 "В лавку забежал 'странный человек', прокричав \n- ЭТО МОЁЁЁ \n он попытался отобрать вашу покупку, но потерпев неудачу сбежал!",
                 "shop_after_buying"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Увидев вашу покупку другой покупатель с напыщенным видом прокомментировал \n - А вот это я брать бы не стал🤭",
                 "shop_after_buying"));
         // town
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Эх, старый добрый город, кто бы ты ни был, куда бы ни шёл, кто-нибудь в этом городе хочет убить тебя.",
                 "town"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Добро пожаловать! Добро пожаловать в Сити 17.\n Сами вы его выбрали, или его выбрали за вас — это лучший город из оставшихся.\n Я такого высокого мнения о Сити 17, что решил разместить свое правительство здесь, в Цитадели, столь заботливо предоставленной нашими Покровителями.\n Я горжусь тем, что называю Сити 17 своим домом.\n Итак, собираетесь ли вы остаться здесь, или же вас ждут неизвестные дали, добро пожаловать в Сити 17. Здесь безопасно.",
                 "town"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "К вам подошел 'странный человек'\n Я не тебе не доверяю.\n Затем он убегает\n Про себя вы думаете - И что это было?",
                 "town"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Зайдя в город вы увидели надпись\n Жить у нас интересно, но нервно.\n Поэтому мы веселые, но злые",
                 "town"));
         // library
 
         // healer
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Как только вы зашли к целителю он улыбнувшись подозвал вас к себе и спросил\n - Что привело вас ко мне, дорогой друг?",
                 "healer"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "У целителя сегодня уйма народу, постояв пол часа, вы наконец зашли",
                 "healer"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "Заходя к целителю вы спросили \n - Доктор, сколько стоит вырвать зуб? \n - 20 долларов. \n- 20 долларов за три минуты?\n- Ну, хорошо, я буду тянуть дольше! \n - Нет, пожалуй не сегодня.",
                 "healer"));
-        list.add(new PhraseSQL(
+        list.add(new PhraseSQL(i++,
                 "- Доктор, я работаю как лошадь, ем как свинья, устаю как собака - что мне делать? \n- Э, батенька, да вам к ветеринару...",
                 "healer"));
         // healer_if_full_hp
@@ -2478,6 +2648,10 @@ public class TelegramBot extends TelegramLongPollingBot {
         String[] arr;
         if (task.getRecipientId() == null) {
             if (task.getCapacity().equals(1)) {
+                task.addRecipientId(String.valueOf(message.getFrom().getId()));
+                user.addActiveTask(taskId);
+                user_table.save(user);
+                task_table.save(task);
                 editMessage(message.getChatId(), "Задание: " + task.getTaskName() + " полностью разобрано!",
                         taskId);
 
