@@ -24,6 +24,12 @@ public class BattleSQL {
     @Column(length = 1000)
     private Long[] secondSideIds;
 
+    private Integer messageId;
+
+    private Integer logId;
+
+    private String logMessage;
+
     public BattleSQL() {
     }
 
@@ -71,6 +77,30 @@ public class BattleSQL {
 
     public void setSecondSideIds(Long[] secondSideIds) {
         this.secondSideIds = secondSideIds;
+    }
+
+    public Integer getMessageId() {
+        return messageId;
+    }
+
+    public void setMessageId(Integer messageId) {
+        this.messageId = messageId;
+    }
+
+    public Integer getLogId() {
+        return logId;
+    }
+
+    public void setLogId(Integer logId) {
+        this.logId = logId;
+    }
+
+    public String getLogMessage() {
+        return logMessage;
+    }
+
+    public void setLogMessage(String logMessage) {
+        this.logMessage = logMessage;
     }
 
 }
