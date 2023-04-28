@@ -19,7 +19,7 @@ public class UserState {
 
     private int idLastBotMessage;
 
-    private int idMenuMessage;
+    private Integer idMenuMessage;
 
     private Long battleId;
 
@@ -75,11 +75,11 @@ public class UserState {
         this.idLastBotMessage = idLastBotMessage;
     }
 
-    public int getIdMenuMessage() {
+    public Integer getIdMenuMessage() {
         return idMenuMessage;
     }
 
-    public void setIdMenuMessage(int idMenuMessage) {
+    public void setIdMenuMessage(Integer idMenuMessage) {
         this.idMenuMessage = idMenuMessage;
     }
 

@@ -209,7 +209,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                         changeHeroName(update.getMessage().getFrom().getId());
                         break;
                     case "/battle":
-                        BattleSQL battle = battle_table.findById(user.getBattleId()).get();
                         switch (messageText) {
                             case "/showBattleMessage":
                                 showFirstBattleMessage(user.getUserId());
@@ -228,6 +227,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                                 break;
                             case "/useAttack":
                                 useAttack(user.getUserId(), Long.valueOf(update.getMessage().getText().split(" ")[1]));
+                                break;
+                            case "/giveUp":
+                                giveUp(user.getUserId());
                                 break;
                             default:
                                 break;
@@ -1060,27 +1062,54 @@ public class TelegramBot extends TelegramLongPollingBot {
         showFirstBattleMessage(enemyId);
     }
 
+    private void giveUp(Long userId) {
+        UserHero hero = user_hero.findById(userId).get();
+        hero.setCurrentHealth(0);
+        user_hero.save(hero);
+
+        BattleSQL battle = battle_table.findById(user_state.findById(userId).get().getBattleId()).get();
+        BattleSQL enemyBattle;
+        battle.setLogMessage("Вы сдались!");
+        battle.setIsEnd(true);
+        battle_table.save(battle);
+
+        showFirstBattleMessage(userId);
+        for (Long id : battle.getSecondSideIds()) {
+            enemyBattle = battle_table.findById(user_state.findById(id).get().getBattleId()).get();
+            enemyBattle.setLogMessage("Противник сдался!");
+            enemyBattle.setIsEnd(true);
+            battle_table.save(enemyBattle);
+            showFirstBattleMessage(id);
+            cancel(id);
+        }
+        cancel(userId);
+    }
+
     private void checkBattleToEnd(BattleSQL battle) {
         BattleSQL enemyBattle = battle_table
                 .findById(user_state.findById(battle.getSecondSideIds()[0]).get().getBattleId()).get();
         boolean isEnd = true;
         UserState hero;
+        UserHero userHero;
 
-        for (Long id : enemyBattle.getSecondSideIds()) {
+        for (Long id : battle.getSecondSideIds()) {
             hero = user_state.findById(id).get();
             hero.setWaitForRequest(true);
-            user_state.save(hero);
+            userHero = user_hero.findById(id).get();
             if (user_hero.findById(id).get().getCurrentHealth() > 0) {
                 isEnd = false;
             }
+            userHero.setCurrentHealth(userHero.getMaxHealth());
+            user_hero.save(userHero);
+            user_state.save(hero);
         }
-        for (Long id : enemyBattle.getFirstSideIds()) {
+        for (Long id : battle.getFirstSideIds()) {
             hero = user_state.findById(id).get();
             hero.setWaitForRequest(false);
             user_state.save(hero);
-            if (user_hero.findById(id).get().getCurrentHealth() > 0) {
-                isEnd = false;
-            }
+            userHero = user_hero.findById(id).get();
+            userHero.setCurrentHealth(userHero.getMaxHealth());
+            user_hero.save(userHero);
         }
 
         battle.setIsEnd(isEnd);
@@ -2932,6 +2961,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private Message sendMenuMessage(long chatId, String textToSend) {
+        deleteMenuMessage(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
@@ -2954,6 +2984,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private Message sendMenuMessage(long chatId, String textToSend, List<List<Pair<String, String>>> buttons) {
+        deleteMenuMessage(chatId);
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
@@ -2978,6 +3009,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void sendMenuMessageWithPic(long chatId, String textToSend, List<List<Pair<String, String>>> buttons,
             String imageUrlToSend) {
+        deleteMenuMessage(chatId);
 
         SendPhoto photo = new SendPhoto();
         photo.setChatId(String.valueOf(chatId));
@@ -3149,6 +3181,33 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void deleteLastMessage(long chatId) {
         DeleteMessage deleteMessage = new DeleteMessage(String.valueOf(chatId),
                 user_state.findById(chatId).get().getIdLastBotMessage());
+
+        try {
+            execute(deleteMessage);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred: " + e.getMessage());
+        }
+    }
+
+    private void deleteMenuMessage(Long chatId) {
+        UserState user = user_state.findById(chatId).get();
+        if (user.getIdMenuMessage() != null) {
+            deleteMessage(chatId, user_state.findById(chatId).get().getIdMenuMessage());
+            DeleteMessage deleteMessage = new DeleteMessage(String.valueOf(chatId), user.getIdMenuMessage());
+
+            user.setIdMenuMessage(null);
+            user_state.save(user);
+
+            try {
+                execute(deleteMessage);
+            } catch (TelegramApiException e) {
+                log.error("Error occurred: " + e.getMessage());
+            }
+        }
+    }
+
+    private void deleteMessage(Long chatId, Integer messageid) {
+        DeleteMessage deleteMessage = new DeleteMessage(String.valueOf(chatId), messageid);
 
         try {
             execute(deleteMessage);
